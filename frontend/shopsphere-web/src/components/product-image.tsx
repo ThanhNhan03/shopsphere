@@ -1,4 +1,36 @@
 import Image from "next/image";
-export function ProductImage({ src, name, large = false }: { src: string; name: string; large?: boolean }) {
-  return <Image src={src} alt={name} width={large ? 640 : 400} height={large ? 480 : 300} className="product-image" priority={large} />;
+import { resolveDeviceIcon } from "@/lib/device-icons";
+import { Icon } from "./icon";
+export function ProductImage({
+  src,
+  name,
+  large = false,
+  category,
+}: {
+  src: string;
+  name: string;
+  large?: boolean;
+  category?: string;
+}) {
+  const icon = resolveDeviceIcon(src, category);
+  if (!icon)
+    return (
+      <div
+        className="product-image device-placeholder"
+        role="img"
+        aria-label={name}
+      >
+        <Icon name="box" size={large ? 120 : 80} />
+      </div>
+    );
+  return (
+    <Image
+      src={icon}
+      alt={name}
+      width={large ? 640 : 400}
+      height={large ? 480 : 300}
+      className="product-image"
+      priority={large}
+    />
+  );
 }

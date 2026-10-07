@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "ShopSphere.Gateway": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:54560;http://localhost:54562"
+    }
+  }
+}

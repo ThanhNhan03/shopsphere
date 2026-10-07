@@ -1,6 +1,8 @@
 # ShopSphere feature completion plan
 
 **Last reviewed:** 2026-10-07
+
+**Authentication update:** Google/Gmail login and Gateway ownership checks are now implemented. Configure the OAuth client and complete a real Google login/account-switch walkthrough using [the login runbook](google-login.md). The anonymous baseline and smoke-script instructions below describe the earlier demo; the scripts require an authenticated harness for the protected public endpoints.
 **Source of truth:** `README.md` and `docs/project-brief.md`
 **Target:** complete and demonstrate the README's end-to-end checkout. Authentication, fulfillment, shipping, tax, admin, reviews, promotions and email delivery are outside this target.
 

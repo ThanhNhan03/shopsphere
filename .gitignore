@@ -17,3 +17,4 @@
 *.log
 *.tsbuildinfo
 artifacts/
+.auth-keys/

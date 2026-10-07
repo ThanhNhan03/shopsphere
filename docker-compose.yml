@@ -42,6 +42,15 @@ services:
       Services__Ordering: http://ordering-api:8080
       Services__Inventory: http://inventory-api:8080
       Services__Payment: http://payment-api:8080
+      Frontend__Url: ${FRONTEND_URL:-http://localhost:3000}
+      Google__ClientId: ${GOOGLE_CLIENT_ID:-}
+      Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:-}
+      Auth__KeyPath: /auth-keys
+      RateLimiting__ReadPermitLimit: ${RATE_LIMIT_READ:-120}
+      RateLimiting__WritePermitLimit: ${RATE_LIMIT_WRITE:-30}
+      RateLimiting__LoginPermitLimit: ${RATE_LIMIT_LOGIN:-10}
+    volumes:
+      - auth-keys:/auth-keys
     ports:
       - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
     depends_on:
@@ -222,6 +231,7 @@ services:
       - seq-data:/data
 
 volumes:
+  auth-keys:
   postgres-data:
   redis-data:
   rabbitmq-data:

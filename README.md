@@ -13,6 +13,8 @@ docker compose up -d --build
 
 Open [the store](http://localhost:3000). Compose creates four service-owned databases, applies committed EF Core migrations and seeds six products with 20 units each. First startup downloads and builds the images.
 
+Google/Gmail sign-in is required for the bag, checkout, orders and payments. Configure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` as described in [Google sign-in setup](docs/google-login.md). Browsing products remains public.
+
 | Component | Local address |
 | --- | --- |
 | Store | http://localhost:3000 |
@@ -143,7 +145,7 @@ GitHub Actions runs backend tests, Compose validation, frontend lint and fronten
 
 ## Scope and limitations
 
-This is an unauthenticated local demonstration: customer IDs and order links are not access controls. Real authentication, authorization, fulfillment, shipping, tax, admin, reviews, promotions and email delivery are outside scope. Notification may log duplicate messages after redelivery; it sends no actual email.
+Google sign-in and Gateway ownership checks protect the storefront's basket, orders and payment operations. Internal services must remain private to the Docker network. Fulfillment, shipping, tax, admin, reviews, promotions and email delivery remain outside scope. Notification may log duplicate messages after redelivery; it sends no actual email.
 
 Stock is held while awaiting payment. Started Stripe sessions rely on webhooks to expire; webhook delivery/reconciliation must be monitored before a real deployment. Demo checkouts can be settled directly from the order page.
 

@@ -1,4 +1,17 @@
+import { Icon } from "./icon";
 export function ErrorMessage({ error }: { error: Error | null }) {
-  return error ? <p role="alert" className="error">{error.message}</p> : null;
+  return error ? (
+    <div role="alert" className="error">
+      <Icon name="close" size={18} />
+      <span>{error.message}</span>
+    </div>
+  ) : null;
 }
-export function Loading() { return <p role="status" className="empty">Loading your store…</p>; }
+export function Loading() {
+  return (
+    <div role="status" className="loading-state">
+      <span className="loading-orbit" />
+      <p>Getting everything ready…</p>
+    </div>
+  );
+}

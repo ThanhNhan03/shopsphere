@@ -1,5 +1,52 @@
 # Validation
 
+## Shared device icons / photo revert — 2026-10-07
+
+- Reverted the vendor-photo experiment and removed its runtime assets, mapping and download script. Restored the six device SVGs, with neutral SSD labeling for reuse across brands.
+- Added a shared device-icon registry, category fallbacks and a generic unknown-device placeholder. Existing catalog and saved-basket SVG paths remain supported; no product data or quantities were changed.
+- Browser verified all eight home images (six products plus banners) load from the restored local SVGs. The Manrope slogan consistency correction remains intact.
+- Frontend production build including TypeScript and ESLint passed. Compose frontend was rebuilt and deployed; the initial Docker snapshot cache error was resolved by a fresh build. Production dependency audit returned zero vulnerabilities.
+- Screenshot: ignored `artifacts/ui-device-icons-restored.png`.
+
+## Typography consistency — 2026-10-07
+
+- Removed the Georgia/italic slogan overrides from home, audio and sign-in banners. All three use Manrope 700 with normal style; accent spans inherit the heading's size, line height, weight and letter spacing.
+- Browser computed styles confirmed matching font family, size, weight, style and letter spacing between each slogan heading and its highlighted word.
+- Visually checked home at 320, 375 and 1440px and sign-in at 375/1440px. No horizontal page or slogan overflow was observed.
+- Production build (including TypeScript) and ESLint passed; Compose frontend was rebuilt and deployed. Screenshot: ignored `artifacts/ui-typography-desktop.png`.
+
+## UI/UX redesign — 2026-10-07
+
+- Applied the local UI/UX Pro Max skill; the design direction, tokens and covered flows are recorded in `ui-design.md`.
+- Next.js production build (including TypeScript) and ESLint passed inside the frontend Docker build stage. The frontend was rebuilt and deployed through Compose.
+- Browser verified: category filtering, price sorting, brand search, empty search results and clearing search with URL recovery; product details and bounded quantity controls.
+- Real Google sign-in through the account chooser succeeded. Adding a Keychron K2 showed success feedback, a saved bag and an authoritative $89 total. Checkout prefilled account details.
+- An empty required name displayed an inline error and focused `customer-name`. No order was created by the invalid submission.
+- A valid checkout created local demo order `1f57323a-3f52-4b9d-940e-feb89b351dad`. Demo failure changed it to Cancelled; no card was charged. The bag retains one keyboard for another attempt.
+- Visually checked home, product, login, empty/full bag, checkout, order/payment and missing-payment-link screens. Home responsive checks covered 320, 375, 768, 1024 and 1440px plus 812px landscape; no horizontal page overflow was observed. Checkout, product and order were also checked at 375px.
+- Visible focus, semantic form labels/errors, touch targets and reduced-motion CSS are included. This is browser QA, not a full accessibility audit.
+- Local preview evidence is saved in ignored `artifacts/ui-home-desktop.png` and `artifacts/ui-home-full.png`.
+
+## Rate limiting and Google account selection — 2026-10-07
+
+- .NET suite: 28 passed, including quotas, independent user buckets, Retry-After, window recovery, forwarding-header spoof resistance and login URL variants.
+- Gateway/frontend Docker builds, frontend TypeScript, ESLint and Compose validation: passed.
+- Browser: Google account chooser appears with `prompt=select_account` and offers **Use another account** even with an existing Google session.
+- Deployed Gateway burst check returned HTTP 429; health remained 200. Counters are local to each Gateway instance; see the login runbook for proxy and multi-instance limits.
+
+## Google authentication validation — 2026-10-07
+
+- Real Google OAuth sign-in: passed with the local configured client.
+- Session survives page reload; signed-in basket read/write and checkout name/email prefill: passed.
+- Logout removes private access; signing back in restores the account's bag and requested return page: passed.
+- .NET suite: 23 passed, including valid OAuth callback fixtures and authentication/ownership/Origin checks.
+- Frontend build/TypeScript and ESLint: passed for the login implementation.
+- Fixed the Docker Data Protection volume ownership so the non-root Gateway can create persistent session keys.
+- Browser walkthrough left one Keychron K2 in the user's bag, without creating an order or charging a payment.
+- Second-account browser isolation remains unverified; cross-account rejection is covered by automated Gateway tests.
+
+The baseline checks below predate mandatory Google sign-in; anonymous smoke scripts need an authenticated harness for protected Gateway endpoints.
+
 Verified locally on 2026-10-07:
 
 - .NET solution build: passed, zero warnings/errors.

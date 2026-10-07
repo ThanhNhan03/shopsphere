@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../ShopSphere.Inventory.Application/ShopSphere.Inventory.Application.csproj" />
+    <ProjectReference Include="../../../BuildingBlocks/ShopSphere.Messaging/ShopSphere.Messaging.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

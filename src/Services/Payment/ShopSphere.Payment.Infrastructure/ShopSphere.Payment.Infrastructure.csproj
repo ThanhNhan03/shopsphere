@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../ShopSphere.Payment.Application/ShopSphere.Payment.Application.csproj" />
+    <ProjectReference Include="../../../BuildingBlocks/ShopSphere.Messaging/ShopSphere.Messaging.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Stripe.net" />
+  </ItemGroup>
+</Project>

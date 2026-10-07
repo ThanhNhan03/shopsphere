@@ -1,0 +1,148 @@
+# ShopSphere
+
+A technology e-commerce demo with .NET 10 microservices, Clean Architecture, Next.js, PostgreSQL, Redis, RabbitMQ/MassTransit, Stripe Checkout, YARP, and Serilog/Seq.
+
+## Run locally
+
+Install Docker Desktop with Linux containers, then:
+
+```powershell
+Copy-Item .env.example .env
+docker compose up -d --build
+```
+
+Open [the store](http://localhost:3000). Compose creates four service-owned databases, applies committed EF Core migrations and seeds six products with 20 units each. First startup downloads and builds the images.
+
+| Component | Local address |
+| --- | --- |
+| Store | http://localhost:3000 |
+| API gateway | http://localhost:8080 |
+| RabbitMQ management | http://localhost:15672 |
+| Seq logs | http://localhost:8081 |
+| PostgreSQL | localhost:6543 |
+| Redis | localhost:6379 |
+
+Local demo credentials are in `.env.example`. Exposed ports bind to loopback. Change host ports in `.env` if needed; when changing the frontend port also update `FRONTEND_URL`. Containers reach PostgreSQL at `postgres:5432`, independently of the host port.
+
+```powershell
+docker compose ps
+docker compose logs -f ordering-api inventory-api payment-api notification-worker
+docker compose down
+```
+
+`down` preserves named data volumes. Do not remove volumes unless you deliberately want to delete the demo data. Recreating a container does not reset stock.
+
+## Payment modes
+
+**Demo** is the default to let the entire flow run without external credentials. Add products, open the bag, enter checkout details, then use **Simulate successful payment** or **Simulate payment failure** on the order page. No card is charged; the UI labels this mode explicitly.
+
+**Stripe** connects to real Stripe infrastructure in test mode:
+
+1. Set `PAYMENT_MODE=Stripe` and `STRIPE_SECRET_KEY=sk_test_...` in the ignored `.env`.
+2. Run `stripe listen --forward-to http://localhost:8080/api/payments/webhooks/stripe` using the [Stripe CLI](https://docs.stripe.com/stripe-cli).
+3. Set `STRIPE_WEBHOOK_SECRET` to the `whsec_...` value printed by the listener.
+4. Run `docker compose up -d payment-api` to recreate Payment with the new settings.
+5. Create a fresh order, continue to Stripe, and use [Stripe test payment details](https://docs.stripe.com/testing).
+
+Only signed, matching test-mode Checkout Session webhooks can settle Stripe payments. The browser redirect merely opens the order page, which polls the backend. Secret keys stay in Payment; no publishable key is needed for a hosted Checkout redirect. Demo simulation is disabled in Stripe mode.
+
+Closing/cancelling Stripe Checkout does not immediately cancel the order: payment can be resumed until the session expires (31 minutes). The `checkout.session.expired` webhook cancels the order and releases stock. Orders whose payment is never started expire after 30 minutes. Keep the webhook listener running.
+
+## Checkout behavior
+
+1. Catalog serves products and prices from `catalog_db`.
+2. Basket stores product quantities in Redis and reads current product information over Catalog HTTP.
+3. Ordering reads the basket over HTTP, validates details and calculates the amount on the server.
+4. Ordering atomically stores the order and `OrderCreatedIntegrationEvent` through the EF transactional bus outbox.
+5. Inventory locks stock rows in product-ID order, reserves all items atomically and emits a reservation result.
+6. Payment creates a pending payment from the reservation event; the checkout endpoint creates an idempotent Stripe Session on demand.
+7. A successful payment confirms the order; Inventory commits reserved stock, Basket removes purchased quantities, and Notification logs a simulated email.
+8. Payment failure cancels the order and emits a release request; Inventory returns reserved stock and Basket remains available for retry.
+
+`CheckoutId` is the order ID and retry key. Repeating the same checkout concurrently returns the original order; reusing that ID with different customer details returns an error. Prices supplied by the browser are ignored.
+
+MassTransit provides persistent bus/consumer outboxes, transactional inbox processing, a seven-day duplicate detection window, retries, and error queues. Domain transitions and reservation records also protect against repeated business operations. Stripe event IDs are retained durably. See [architecture](docs/architecture.md), [order flow](docs/order-flow.md), and [event contracts](docs/events.md).
+
+## Structure
+
+```text
+ShopSphere.sln
+Directory.Build.props / Directory.Packages.props
+Dockerfile                       # shared .NET multi-stage build
+docker-compose.yml / .env.example
+src/
+  Gateway/ShopSphere.Gateway
+  Services/
+    Catalog/                     # Api, Application, Domain, Infrastructure
+    Basket/                      # Api, Application, Infrastructure
+    Ordering/                    # Api, Application, Domain, Infrastructure
+    Inventory/                   # Api, Application, Domain, Infrastructure
+    Payment/                     # Api, Application, Domain, Infrastructure
+  Workers/ShopSphere.Notification.Worker
+  BuildingBlocks/
+    ShopSphere.SharedKernel      # boundary validation/errors
+    ShopSphere.Messaging         # hosting/logging/outbox setup
+contracts/ShopSphere.Contracts
+frontend/shopsphere-web           # Next.js App Router, React Query, Zod, Tailwind
+tests/ShopSphere.Tests
+infra/postgres/create-databases.sh
+scripts/
+docs/
+```
+
+Domain does not reference Infrastructure. Application defines service operations. Infrastructure implements persistence, HTTP clients, consumers and Stripe. APIs map requests to those operations. Each service owns its database; cross-service access uses APIs or events.
+
+The original design and team/day plan are preserved in [project brief](docs/project-brief.md). The runtime uses two practical simplifications: no separate EventBus wrapper over MassTransit, and the Notification worker is a small hosted process with a health endpoint.
+
+## Develop and verify
+
+Requires .NET SDK 10 and Node.js 24 for commands outside Docker:
+
+```powershell
+dotnet restore ShopSphere.sln
+dotnet test ShopSphere.sln -c Release
+cd frontend/shopsphere-web
+npm ci
+npm run lint
+npm run typecheck
+npm run build
+```
+
+To run Next.js against the Compose gateway during UI development, copy `frontend/shopsphere-web/.env.example` to `.env.local` and run `npm run dev -- --port 3001`. The server-side proxy reads `GATEWAY_URL` at runtime; the browser always calls same-origin `/api`.
+
+For migration changes:
+
+```powershell
+dotnet tool restore
+dotnet ef migrations add YourChange --project src/Services/Ordering/ShopSphere.Ordering.Infrastructure --startup-project src/Services/Ordering/ShopSphere.Ordering.Api --output-dir Persistence/Migrations
+```
+
+Substitute the owning service. Design-time factories create migration models without connecting to a database; runtime configuration comes from Compose. Committed migrations run at startup, suitable for this single-instance demo. Coordinate migrations separately before deploying multiple instances.
+
+With the stack running in Demo mode:
+
+```powershell
+node scripts/smoke-test.mjs
+```
+
+The smoke check exercises real HTTP, PostgreSQL, Redis and RabbitMQ, including concurrent checkout retries, duplicate settlement, insufficient inventory and compensation. It consumes one SSD per successful run and uses isolated customer IDs.
+
+Signed webhook fixtures can be checked without a Stripe account:
+
+```powershell
+docker compose run -d --no-deps --name shopsphere-webhook-test -p 127.0.0.1:5105:8080 -e Payment__Mode=Stripe -e Stripe__WebhookSecret=whsec_fixture_only payment-api
+node scripts/stripe-webhook-test.mjs
+docker rm -f shopsphere-webhook-test
+```
+
+This checks signature rejection, amount matching, duplicate webhook persistence, successful confirmation and failed-payment compensation using synthetic Sessions. It does **not** verify external Stripe Session creation or a real Stripe payment.
+
+GitHub Actions runs backend tests, Compose validation, frontend lint and frontend build.
+
+## Scope and limitations
+
+This is an unauthenticated local demonstration: customer IDs and order links are not access controls. Real authentication, authorization, fulfillment, shipping, tax, admin, reviews, promotions and email delivery are outside scope. Notification may log duplicate messages after redelivery; it sends no actual email.
+
+Stock is held while awaiting payment. Started Stripe sessions rely on webhooks to expire; webhook delivery/reconciliation must be monitored before a real deployment. Demo checkouts can be settled directly from the order page.
+
+Production frontend dependencies currently pass `npm audit --omit=dev`. The Next.js lint toolchain includes an upstream `braces` advisory without a patched release at implementation time; this is a development dependency, tracked in [validation notes](docs/validation.md).

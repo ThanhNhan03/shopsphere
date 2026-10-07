@@ -1,0 +1,228 @@
+name: shopsphere
+
+x-app: &app
+  restart: unless-stopped
+  environment: &common
+    ASPNETCORE_ENVIRONMENT: Docker
+    ASPNETCORE_HTTP_PORTS: "8080"
+    Seq__Url: http://seq:5341
+    RabbitMq__Host: rabbitmq
+    RabbitMq__Username: ${RABBITMQ_USER:-shopsphere}
+    RabbitMq__Password: ${RABBITMQ_PASSWORD:-shopsphere-local}
+
+x-data-dependencies: &data-dependencies
+  postgres-init:
+    condition: service_completed_successfully
+  rabbitmq:
+    condition: service_healthy
+
+services:
+  frontend:
+    restart: unless-stopped
+    build: ./frontend/shopsphere-web
+    environment:
+      GATEWAY_URL: http://gateway:8080
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+  gateway:
+    <<: *app
+    build:
+      context: .
+      args:
+        PROJECT: src/Gateway/ShopSphere.Gateway/ShopSphere.Gateway.csproj
+        ASSEMBLY: ShopSphere.Gateway
+    environment:
+      <<: *common
+      Services__Catalog: http://catalog-api:8080
+      Services__Basket: http://basket-api:8080
+      Services__Ordering: http://ordering-api:8080
+      Services__Inventory: http://inventory-api:8080
+      Services__Payment: http://payment-api:8080
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      catalog-api:
+        condition: service_healthy
+      basket-api:
+        condition: service_healthy
+      ordering-api:
+        condition: service_healthy
+      inventory-api:
+        condition: service_healthy
+      payment-api:
+        condition: service_healthy
+
+  catalog-api:
+    <<: *app
+    build:
+      context: .
+      args:
+        PROJECT: src/Services/Catalog/ShopSphere.Catalog.Api/ShopSphere.Catalog.Api.csproj
+        ASSEMBLY: ShopSphere.Catalog.Api
+    environment:
+      <<: *common
+      ConnectionStrings__Database: Host=postgres;Port=5432;Database=catalog_db;Username=${POSTGRES_USER:-shopsphere};Password=${POSTGRES_PASSWORD:-shopsphere-local}
+    depends_on:
+      postgres-init:
+        condition: service_completed_successfully
+
+  basket-api:
+    <<: *app
+    build:
+      context: .
+      args:
+        PROJECT: src/Services/Basket/ShopSphere.Basket.Api/ShopSphere.Basket.Api.csproj
+        ASSEMBLY: ShopSphere.Basket.Api
+    environment:
+      <<: *common
+      ConnectionStrings__Redis: redis:6379
+      Services__Catalog: http://catalog-api:8080
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      catalog-api:
+        condition: service_healthy
+
+  ordering-api:
+    <<: *app
+    build:
+      context: .
+      args:
+        PROJECT: src/Services/Ordering/ShopSphere.Ordering.Api/ShopSphere.Ordering.Api.csproj
+        ASSEMBLY: ShopSphere.Ordering.Api
+    environment:
+      <<: *common
+      ConnectionStrings__Database: Host=postgres;Port=5432;Database=ordering_db;Username=${POSTGRES_USER:-shopsphere};Password=${POSTGRES_PASSWORD:-shopsphere-local}
+      Services__Basket: http://basket-api:8080
+    depends_on:
+      <<: *data-dependencies
+      basket-api:
+        condition: service_healthy
+
+  inventory-api:
+    <<: *app
+    build:
+      context: .
+      args:
+        PROJECT: src/Services/Inventory/ShopSphere.Inventory.Api/ShopSphere.Inventory.Api.csproj
+        ASSEMBLY: ShopSphere.Inventory.Api
+    environment:
+      <<: *common
+      ConnectionStrings__Database: Host=postgres;Port=5432;Database=inventory_db;Username=${POSTGRES_USER:-shopsphere};Password=${POSTGRES_PASSWORD:-shopsphere-local}
+    depends_on:
+      <<: *data-dependencies
+
+  payment-api:
+    <<: *app
+    build:
+      context: .
+      args:
+        PROJECT: src/Services/Payment/ShopSphere.Payment.Api/ShopSphere.Payment.Api.csproj
+        ASSEMBLY: ShopSphere.Payment.Api
+    environment:
+      <<: *common
+      ConnectionStrings__Database: Host=postgres;Port=5432;Database=payment_db;Username=${POSTGRES_USER:-shopsphere};Password=${POSTGRES_PASSWORD:-shopsphere-local}
+      Payment__Mode: ${PAYMENT_MODE:-Demo}
+      Stripe__SecretKey: ${STRIPE_SECRET_KEY:-}
+      Stripe__WebhookSecret: ${STRIPE_WEBHOOK_SECRET:-}
+      Frontend__Url: ${FRONTEND_URL:-http://localhost:3000}
+    depends_on:
+      <<: *data-dependencies
+
+  notification-worker:
+    <<: *app
+    build:
+      context: .
+      args:
+        PROJECT: src/Workers/ShopSphere.Notification.Worker/ShopSphere.Notification.Worker.csproj
+        ASSEMBLY: ShopSphere.Notification.Worker
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-shopsphere}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shopsphere-local}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-6543}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  postgres-init:
+    image: postgres:18-alpine
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER:-shopsphere}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-shopsphere-local}
+    volumes:
+      - ./infra/postgres/create-databases.sh:/create-databases.sh:ro
+    entrypoint: ["/bin/sh", "/create-databases.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  rabbitmq:
+    image: rabbitmq:4.2-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-shopsphere}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-shopsphere-local}
+    ports:
+      - "127.0.0.1:${RABBITMQ_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_UI_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  seq:
+    image: datalust/seq:2025.2
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_NOAUTHENTICATION: "True"
+    ports:
+      - "127.0.0.1:${SEQ_UI_PORT:-8081}:80"
+      - "127.0.0.1:${SEQ_INGEST_PORT:-5341}:5341"
+    volumes:
+      - seq-data:/data
+
+volumes:
+  postgres-data:
+  redis-data:
+  rabbitmq-data:
+  seq-data:

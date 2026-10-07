@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="../../BuildingBlocks/ShopSphere.Messaging/ShopSphere.Messaging.csproj" />
+    <ProjectReference Include="../../../contracts/ShopSphere.Contracts/ShopSphere.Contracts.csproj" />
+
+  </ItemGroup>
+</Project>

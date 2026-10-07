@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../ShopSphere.Ordering.Domain/ShopSphere.Ordering.Domain.csproj" />
+    <ProjectReference Include="../../../../contracts/ShopSphere.Contracts/ShopSphere.Contracts.csproj" />
+
+  </ItemGroup>
+</Project>

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsTestProject>true</IsTestProject><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Services/Ordering/ShopSphere.Ordering.Domain/ShopSphere.Ordering.Domain.csproj" />
+    <ProjectReference Include="../../src/Services/Inventory/ShopSphere.Inventory.Domain/ShopSphere.Inventory.Domain.csproj" />
+    <ProjectReference Include="../../src/Services/Payment/ShopSphere.Payment.Domain/ShopSphere.Payment.Domain.csproj" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+  </ItemGroup>
+</Project>

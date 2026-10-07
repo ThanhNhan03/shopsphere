@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../ShopSphere.Basket.Application/ShopSphere.Basket.Application.csproj" />
+    <ProjectReference Include="../../../BuildingBlocks/ShopSphere.Messaging/ShopSphere.Messaging.csproj" />
+    <PackageReference Include="StackExchange.Redis" />
+  </ItemGroup>
+</Project>

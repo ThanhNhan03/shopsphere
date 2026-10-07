@@ -94,6 +94,8 @@ Domain does not reference Infrastructure. Application defines service operations
 
 The original design and team/day plan are preserved in [project brief](docs/project-brief.md). The runtime uses two practical simplifications: no separate EventBus wrapper over MassTransit, and the Notification worker is a small hosted process with a health endpoint.
 
+See the [feature completion plan](docs/feature-roadmap.md) for the remaining Stripe verification and release checklist.
+
 ## Develop and verify
 
 Requires .NET SDK 10 and Node.js 24 for commands outside Docker:

@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using ShopSphere.Catalog.Infrastructure;
+using ShopSphere.Inventory.Infrastructure;
 
 #nullable disable
 
-namespace ShopSphere.Catalog.Infrastructure.Persistence.Migrations
+namespace ShopSphere.Inventory.Infrastructure.Persistence.Migrations
 {
-    [DbContext(typeof(CatalogDb))]
-    partial class CatalogDbModelSnapshot : ModelSnapshot
+    [DbContext(typeof(InventoryDb))]
+    [Migration("20261007165739_StockVersion")]
+    partial class StockVersion
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -190,108 +193,38 @@ namespace ShopSphere.Catalog.Infrastructure.Persistence.Migrations
                     b.ToTable("OutboxState");
                 });
 
-            modelBuilder.Entity("ShopSphere.Catalog.Domain.Product", b =>
+            modelBuilder.Entity("ShopSphere.Inventory.Domain.Reservation", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<Guid>("OrderId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Brand")
+                    b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.HasKey("OrderId");
 
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("ImageUrl")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<decimal>("Price")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name", "Id");
-
-                    b.HasIndex("Price", "Id");
-
-                    b.ToTable("Products");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("00000000-0000-0000-0000-000000000001"),
-                            Brand = "Apple",
-                            Category = "Laptops",
-                            Description = "A light, powerful laptop for everyday creative work. 13-inch display, 16 GB memory, 256 GB SSD.",
-                            ImageUrl = "/products/laptop.svg",
-                            Name = "MacBook Air M4",
-                            Price = 999m
-                        },
-                        new
-                        {
-                            Id = new Guid("00000000-0000-0000-0000-000000000002"),
-                            Brand = "Sony",
-                            Category = "Audio",
-                            Description = "Wireless over-ear headphones with noise cancellation and up to 30 hours of battery life.",
-                            ImageUrl = "/products/headphones.svg",
-                            Name = "WH-1000XM5",
-                            Price = 299m
-                        },
-                        new
-                        {
-                            Id = new Guid("00000000-0000-0000-0000-000000000003"),
-                            Brand = "Logitech",
-                            Category = "Accessories",
-                            Description = "A comfortable wireless mouse with quiet clicks, precise scrolling and USB-C charging.",
-                            ImageUrl = "/products/mouse.svg",
-                            Name = "MX Master 3S",
-                            Price = 99m
-                        },
-                        new
-                        {
-                            Id = new Guid("00000000-0000-0000-0000-000000000004"),
-                            Brand = "Apple",
-                            Category = "Monitors",
-                            Description = "A bright 27-inch 5K display for your desk, with an integrated camera and speakers.",
-                            ImageUrl = "/products/monitor.svg",
-                            Name = "Studio Display",
-                            Price = 1599m
-                        },
-                        new
-                        {
-                            Id = new Guid("00000000-0000-0000-0000-000000000005"),
-                            Brand = "Keychron",
-                            Category = "Accessories",
-                            Description = "A compact wireless mechanical keyboard with a tactile typing feel and a durable aluminum frame.",
-                            ImageUrl = "/products/keyboard.svg",
-                            Name = "Keychron K2",
-                            Price = 89m
-                        },
-                        new
-                        {
-                            Id = new Guid("00000000-0000-0000-0000-000000000006"),
-                            Brand = "Samsung",
-                            Category = "Storage",
-                            Description = "1 TB of fast, portable storage in a pocket-sized aluminum enclosure.",
-                            ImageUrl = "/products/ssd.svg",
-                            Name = "Portable SSD T7",
-                            Price = 109m
-                        });
+                    b.ToTable("Reservations");
                 });
 
-            modelBuilder.Entity("ShopSphere.Catalog.Domain.ProductAvailability", b =>
+            modelBuilder.Entity("ShopSphere.Inventory.Domain.ReservationItem", b =>
+                {
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.HasKey("OrderId", "ProductId");
+
+                    b.ToTable("ReservationItem");
+                });
+
+            modelBuilder.Entity("ShopSphere.Inventory.Domain.Stock", b =>
                 {
                     b.Property<Guid>("ProductId")
                         .ValueGeneratedOnAdd()
@@ -300,18 +233,63 @@ namespace ShopSphere.Catalog.Infrastructure.Persistence.Migrations
                     b.Property<int>("AvailableQuantity")
                         .HasColumnType("integer");
 
+                    b.Property<int>("ReservedQuantity")
+                        .HasColumnType("integer");
+
                     b.Property<long>("Version")
-                        .HasColumnType("bigint");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L);
 
                     b.HasKey("ProductId");
 
-                    b.HasIndex("ProductId")
-                        .HasDatabaseName("IX_AvailableProducts")
-                        .HasFilter("\"AvailableQuantity\" > 0");
-
-                    b.ToTable("ProductAvailability", null, t =>
+                    b.ToTable("Stocks", t =>
                         {
-                            t.HasCheckConstraint("nonnegative_availability", "\"AvailableQuantity\" >= 0 AND \"Version\" >= 0");
+                            t.HasCheckConstraint("nonnegative_stock", "\"AvailableQuantity\" >= 0 AND \"ReservedQuantity\" >= 0");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            ProductId = new Guid("00000000-0000-0000-0000-000000000001"),
+                            AvailableQuantity = 20,
+                            ReservedQuantity = 0,
+                            Version = 0L
+                        },
+                        new
+                        {
+                            ProductId = new Guid("00000000-0000-0000-0000-000000000002"),
+                            AvailableQuantity = 20,
+                            ReservedQuantity = 0,
+                            Version = 0L
+                        },
+                        new
+                        {
+                            ProductId = new Guid("00000000-0000-0000-0000-000000000003"),
+                            AvailableQuantity = 20,
+                            ReservedQuantity = 0,
+                            Version = 0L
+                        },
+                        new
+                        {
+                            ProductId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            AvailableQuantity = 20,
+                            ReservedQuantity = 0,
+                            Version = 0L
+                        },
+                        new
+                        {
+                            ProductId = new Guid("00000000-0000-0000-0000-000000000005"),
+                            AvailableQuantity = 20,
+                            ReservedQuantity = 0,
+                            Version = 0L
+                        },
+                        new
+                        {
+                            ProductId = new Guid("00000000-0000-0000-0000-000000000006"),
+                            AvailableQuantity = 20,
+                            ReservedQuantity = 0,
+                            Version = 0L
                         });
                 });
 
@@ -325,6 +303,20 @@ namespace ShopSphere.Catalog.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("InboxMessageId", "InboxConsumerId")
                         .HasPrincipalKey("MessageId", "ConsumerId");
+                });
+
+            modelBuilder.Entity("ShopSphere.Inventory.Domain.ReservationItem", b =>
+                {
+                    b.HasOne("ShopSphere.Inventory.Domain.Reservation", null)
+                        .WithMany("Items")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ShopSphere.Inventory.Domain.Reservation", b =>
+                {
+                    b.Navigation("Items");
                 });
 #pragma warning restore 612, 618
         }

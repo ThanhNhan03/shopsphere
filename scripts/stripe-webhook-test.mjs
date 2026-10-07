@@ -29,8 +29,7 @@ async function webhook(event, valid = true) {
     headers: { "Content-Type": "application/json", "Stripe-Signature": `t=${timestamp},v1=${valid ? signature : "invalid"}` },
     body: payload });
 }
-const products = await api("/api/products");
-const product = products.find(p => p.name === "MX Master 3S");
+const product = await api("/api/products/00000000-0000-0000-0000-000000000003");
 const initial = await api(`/api/inventory/${product.id}`);
 async function makeOrder() {
   const customerId = randomUUID();

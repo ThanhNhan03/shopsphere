@@ -21,17 +21,32 @@ function CustomerProvider({ children }: { children: React.ReactNode }) {
 export const useCustomer = () => useContext(Customer);
 export function useBasket() {
   const customer = useCustomer();
-  return useQuery({ queryKey: ["basket", customer], queryFn: () => api<Basket>(`/api/basket/${customer}`), enabled: !!customer, refetchInterval: 5000 });
+  return useQuery({ queryKey: ["basket", customer], queryFn: ({ signal }) => api<Basket>(`/api/basket/${customer}`, { signal }), enabled: !!customer, refetchInterval: 5000 });
 }
 export function useBasketChange() {
   const router = useRouter();
   const customer = useCustomer();
   const client = useQueryClient();
   return useMutation({
+    mutationKey: ["basket-change", customer],
+    scope: { id: `basket-${customer}` },
+    onMutate: () => client.cancelQueries({ queryKey: ["basket", customer] }),
     mutationFn: ({ productId, quantity, method }: { productId: string; quantity?: number; method: "POST" | "PUT" | "DELETE" }) => {
       if (!customer) { router.push(`/login?returnUrl=${encodeURIComponent(window.location.pathname)}`); throw new Error("Sign in to add items to your bag."); }
-      return api(`/api/basket/${customer}/items${method === "POST" ? "" : `/${productId}`}`, method === "DELETE" ? { method } : json(method, { productId, quantity }));
+      return api<Basket | undefined>(`/api/basket/${customer}/items${method === "POST" ? "" : `/${productId}`}`, method === "DELETE" ? { method } : json(method, { productId, quantity }));
     },
-    onSuccess: () => client.invalidateQueries({ queryKey: ["basket", customer] }),
+    onSuccess: (result, variables) => {
+      const key = ["basket", customer];
+      if (result) { client.setQueryData(key, result); return; }
+      if (variables.method === "DELETE") {
+        client.setQueryData<Basket>(key, (previous) => {
+          if (!previous) return previous;
+          const items = previous.items.filter((item) => item.productId !== variables.productId);
+          return { ...previous, items, total: items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0),
+            canCheckout: items.length > 0 && items.every((item) => item.quantity <= item.availableQuantity) };
+        });
+      }
+    },
+    onError: () => client.invalidateQueries({ queryKey: ["basket", customer] }),
   });
 }

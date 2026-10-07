@@ -75,9 +75,14 @@ services:
     environment:
       <<: *common
       ConnectionStrings__Database: Host=postgres;Port=5432;Database=catalog_db;Username=${POSTGRES_USER:-shopsphere};Password=${POSTGRES_PASSWORD:-shopsphere-local}
+      Services__Inventory: http://inventory-api:8080
     depends_on:
       postgres-init:
         condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      inventory-api:
+        condition: service_healthy
 
   basket-api:
     <<: *app
@@ -90,12 +95,15 @@ services:
       <<: *common
       ConnectionStrings__Redis: redis:6379
       Services__Catalog: http://catalog-api:8080
+      Services__Inventory: http://inventory-api:8080
     depends_on:
       redis:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
       catalog-api:
+        condition: service_healthy
+      inventory-api:
         condition: service_healthy
 
   ordering-api:

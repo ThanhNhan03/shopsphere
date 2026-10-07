@@ -5,12 +5,14 @@ public sealed class Stock
     public Guid ProductId { get; set; }
     public int AvailableQuantity { get; set; }
     public int ReservedQuantity { get; set; }
+    public long Version { get; set; }
     public bool Reserve(int quantity)
     {
         Guard.Require(quantity > 0, "Reservation quantity must be positive.");
         if (AvailableQuantity < quantity) return false;
         AvailableQuantity -= quantity;
         ReservedQuantity += quantity;
+        Version++;
         return true;
     }
     public void Release(int quantity)
@@ -18,11 +20,13 @@ public sealed class Stock
         Guard.Require(quantity > 0 && quantity <= ReservedQuantity, "Invalid inventory release.");
         ReservedQuantity -= quantity;
         AvailableQuantity += quantity;
+        Version++;
     }
     public void Commit(int quantity)
     {
         Guard.Require(quantity > 0 && quantity <= ReservedQuantity, "Invalid inventory commitment.");
         ReservedQuantity -= quantity;
+        Version++;
     }
 }
 public sealed class Reservation

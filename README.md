@@ -15,6 +15,8 @@ Open [the store](http://localhost:3000). Compose creates four service-owned data
 
 Google/Gmail sign-in is required for the bag, checkout, orders and payments. Configure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` as described in [Google sign-in setup](docs/google-login.md). Browsing products remains public.
 
+For the optional million-product dataset, resumable generation, bounded product API and read-only verification, see [Catalog sample data](docs/catalog-dataset.md). The regular EF seed still creates only the original six products; large data is loaded explicitly with `scripts/seed-catalog.ps1`.
+
 | Component | Local address |
 | --- | --- |
 | Store | http://localhost:3000 |
@@ -53,8 +55,8 @@ Closing/cancelling Stripe Checkout does not immediately cancel the order: paymen
 ## Checkout behavior
 
 1. Catalog serves products and prices from `catalog_db`.
-2. Basket stores product quantities in Redis and reads current product information over Catalog HTTP.
-3. Ordering reads the basket over HTTP, validates details and calculates the amount on the server.
+2. Basket stores product quantities in Redis and reads current product information over Catalog HTTP and available stock over Inventory HTTP. Adding/increasing a line checks its cumulative quantity against current stock.
+3. Ordering reads the refreshed basket over HTTP, rejects known stock shortages before creating an order, validates details and calculates the amount on the server.
 4. Ordering atomically stores the order and `OrderCreatedIntegrationEvent` through the EF transactional bus outbox.
 5. Inventory locks stock rows in product-ID order, reserves all items atomically and emits a reservation result.
 6. Payment creates a pending payment from the reservation event; the checkout endpoint creates an idempotent Stripe Session on demand.
@@ -62,6 +64,10 @@ Closing/cancelling Stripe Checkout does not immediately cancel the order: paymen
 8. Payment failure cancels the order and emits a release request; Inventory returns reserved stock and Basket remains available for retry.
 
 `CheckoutId` is the order ID and retry key. Repeating the same checkout concurrently returns the original order; reusing that ID with different customer details returns an error. Prices supplied by the browser are ignored.
+
+Basket lines expose `availableQuantity`, and the basket exposes `canCheckout`. Known shortages return HTTP 409; unavailable Inventory checks return HTTP 503. Bag checks do not reserve stock: another buyer can acquire the last units before the final locked Inventory reservation, which may still reject the order.
+
+The catalog lists available products by default; **Include out of stock** explicitly shows sold-out items with purchasing disabled. Availability is projected from Inventory events before pagination and checked live in one batch per visible page. Existing bag quantities count toward the add limit. See [catalog availability](docs/catalog-availability.md) for synchronization, contracts and checks.
 
 MassTransit provides persistent bus/consumer outboxes, transactional inbox processing, a seven-day duplicate detection window, retries, and error queues. Domain transitions and reservation records also protect against repeated business operations. Stripe event IDs are retained durably. See [architecture](docs/architecture.md), [order flow](docs/order-flow.md), and [event contracts](docs/events.md).
 
@@ -126,10 +132,19 @@ Substitute the owning service. Design-time factories create migration models wit
 With the stack running in Demo mode:
 
 ```powershell
+node scripts/basket-stock-test.mjs
+node scripts/verify-availability-projection.mjs
+```
+
+This stock check requires the optional generated dataset. It uses internal Compose services and isolated basket keys, verifies cumulative/concurrent stock caps and rejection before order creation, then exercises reservation/release with a cancelled Demo QA order. It leaves that order as test evidence, removes its basket keys and verifies natural stock compensation; it does not reset stock or change user bags. Gateway Google authentication remains enabled.
+
+The older baseline smoke harness is also available:
+
+```powershell
 node scripts/smoke-test.mjs
 ```
 
-The smoke check exercises real HTTP, PostgreSQL, Redis and RabbitMQ, including concurrent checkout retries, duplicate settlement, insufficient inventory and compensation. It consumes one SSD per successful run and uses isolated customer IDs.
+The baseline smoke check exercises real HTTP, PostgreSQL, Redis and RabbitMQ, including concurrent checkout retries, duplicate settlement, insufficient inventory and compensation. It consumes one SSD per successful run and uses isolated customer IDs. Its anonymous Gateway calls predate mandatory sign-in and require an authenticated harness before use with the current configuration.
 
 Signed webhook fixtures can be checked without a Stripe account:
 

@@ -26,8 +26,16 @@ public sealed class Orders(OrderingDb db, HttpClient baskets, IPublishEndpoint p
         }
         var response = await baskets.GetAsync($"/api/basket/{Uri.EscapeDataString(request.CustomerId)}", ct);
         if (response.StatusCode == System.Net.HttpStatusCode.BadRequest) throw new ApiException(400, "Invalid customer identifier.");
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+            throw new ApiException(503, "Your bag and stock availability cannot be verified. Please try again shortly.");
         var basket = await response.Content.ReadFromJsonAsync<BasketSnapshot>(ct) ?? throw new ApiException(409, "Basket unavailable.");
+        foreach (var item in basket.Items)
+        {
+            if (item.AvailableQuantity is null)
+                throw new ApiException(503, "Stock availability cannot be verified. Please try again shortly.");
+            if (item.Quantity > item.AvailableQuantity)
+                throw new ApiException(409, $"{item.Name}: only {item.AvailableQuantity} available. Update your bag before placing the order.");
+        }
         var order = Order.Create(request.CheckoutId, request.CustomerId, request.CustomerName, request.Email,
             basket.Items.Select(i => new OrderItem { ProductId = i.ProductId, Name = i.Name, UnitPrice = i.UnitPrice, Quantity = i.Quantity }).ToList());
         db.Orders.Add(order);
@@ -39,5 +47,5 @@ public sealed class Orders(OrderingDb db, HttpClient baskets, IPublishEndpoint p
         return order;
     }
     private record BasketSnapshot(BasketLine[] Items);
-    private record BasketLine(Guid ProductId, string Name, decimal UnitPrice, int Quantity);
+    private record BasketLine(Guid ProductId, string Name, decimal UnitPrice, int Quantity, int? AvailableQuantity);
 }

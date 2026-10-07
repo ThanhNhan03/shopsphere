@@ -1,8 +1,14 @@
 namespace ShopSphere.Basket.Application;
-public record BasketItem(Guid ProductId, string Name, decimal UnitPrice, int Quantity, string ImageUrl);
+public record BasketItem(Guid ProductId, string Name, decimal UnitPrice, int Quantity, string ImageUrl, int AvailableQuantity);
 public record Basket(string CustomerId, BasketItem[] Items)
 {
     public decimal Total => Items.Sum(i => i.UnitPrice * i.Quantity);
+    public bool CanCheckout => Items.Length > 0 && Items.All(i => i.Quantity <= i.AvailableQuantity);
+}
+
+public interface IStockAvailability
+{
+    Task<int> Available(Guid productId, CancellationToken ct);
 }
 public record AddItemRequest(Guid ProductId, int Quantity);
 public record QuantityRequest(int Quantity);

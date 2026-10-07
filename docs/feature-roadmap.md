@@ -1,7 +1,7 @@
 # ShopSphere feature completion plan
 
-**Last reviewed:** 2026-10-07  
-**Source of truth:** `README.md` and `docs/project-brief.md`  
+**Last reviewed:** 2026-10-07
+**Source of truth:** `README.md` and `docs/project-brief.md`
 **Target:** complete and demonstrate the README's end-to-end checkout. Authentication, fulfillment, shipping, tax, admin, reviews, promotions and email delivery are outside this target.
 
 ## Current status

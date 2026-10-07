@@ -6,10 +6,13 @@ namespace ShopSphere.Inventory.Infrastructure;
 public sealed class InventoryDb(DbContextOptions<InventoryDb> options) : DbContext(options)
 {
     public DbSet<Stock> Stocks => Set<Stock>();
+    public DbSet<StockAdjustment> Adjustments => Set<StockAdjustment>();
     public DbSet<Reservation> Reservations => Set<Reservation>();
     protected override void OnModelCreating(ModelBuilder model)
     {
         model.Entity<Stock>().HasKey(s => s.ProductId);
+        model.Entity<StockAdjustment>().HasIndex(a => new { a.ProductId, a.CreatedAt });
+        model.Entity<StockAdjustment>().Property(a => a.Reason).HasMaxLength(250);
         model.Entity<Stock>().ToTable(t => t.HasCheckConstraint("nonnegative_stock", "\"AvailableQuantity\" >= 0 AND \"ReservedQuantity\" >= 0"));
         model.Entity<Stock>().HasData(Enumerable.Range(1, 6).Select(i => new Stock
         { ProductId = Guid.Parse($"00000000-0000-0000-0000-{i:D12}"), AvailableQuantity = 20 }));

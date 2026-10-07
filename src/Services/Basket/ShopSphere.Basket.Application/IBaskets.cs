@@ -1,5 +1,5 @@
 namespace ShopSphere.Basket.Application;
-public record BasketItem(Guid ProductId, string Name, decimal UnitPrice, int Quantity, string ImageUrl);
+public record BasketItem(Guid ProductId, string Name, decimal UnitPrice, int Quantity, string ImageUrl, bool IsAvailable = true);
 public record Basket(string CustomerId, BasketItem[] Items)
 {
     public decimal Total => Items.Sum(i => i.UnitPrice * i.Quantity);

@@ -1,10 +1,10 @@
 # ShopSphere feature completion plan
 
-**Last reviewed:** 2026-10-07
+**Last reviewed:** 2026-10-08
 
-**Authentication update:** Google/Gmail login and Gateway ownership checks are now implemented. Configure the OAuth client and complete a real Google login/account-switch walkthrough using [the login runbook](google-login.md). The anonymous baseline and smoke-script instructions below describe the earlier demo; the scripts require an authenticated harness for the protected public endpoints.
+**Scope update:** The subsequent administration request adds local email/password registration/login, a seeded administrator, product/stock/order management, and MinIO photo storage. See [the admin runbook](admin.md) and use `node --env-file=.env scripts/admin-smoke-test.mjs` for authenticated verification. Google/Gmail remains an optional login provider with Gateway ownership checks. The older anonymous baseline and day plan below are retained as the original checkout plan, not the current implementation scope.
 **Source of truth:** `README.md` and `docs/project-brief.md`
-**Target:** complete and demonstrate the README's end-to-end checkout. Authentication, fulfillment, shipping, tax, admin, reviews, promotions and email delivery are outside this target.
+**Target:** complete and demonstrate the README's checkout and the requested administration/account features. Fulfillment, shipping, tax, reviews, promotions and email delivery remain outside this target.
 
 ## Current status
 

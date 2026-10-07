@@ -27,7 +27,7 @@ public static class StoreRateLimiting
                     if (!c.Request.Path.StartsWithSegments("/api")) return RateLimitPartition.GetNoLimiter("public");
                     var source = Source(c);
                     if (IsWebhook(c)) return Window("webhook:" + source, webhook, windowSeconds);
-                    if (Matches(c, "/api/auth/google")) return Window("login:" + source, login, windowSeconds);
+                    if (Matches(c, "/api/auth/google") || Matches(c, "/api/auth/login") || Matches(c, "/api/auth/register")) return Window("login:" + source, login, windowSeconds);
                     if (Matches(c, "/api/auth/google/callback")) return Window("callback:" + source, callbacks, windowSeconds);
                     var identity = c.User.FindFirstValue("customer_id") is { } user ? "user:" + user : "connection:" + source;
                     var read = HttpMethods.IsGet(c.Request.Method) || HttpMethods.IsHead(c.Request.Method);

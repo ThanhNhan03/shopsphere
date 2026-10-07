@@ -6,7 +6,7 @@ import type { Basket } from "@/types";
 import { useRouter } from "next/navigation";
 
 const Customer = createContext<string | null>(null);
-export type AuthSession = { googleEnabled: boolean; user: { customerId: string; name: string; email: string } | null };
+export type AuthSession = { googleEnabled: boolean; user: { customerId: string; name: string; email: string; isAdmin: boolean; provider: string } | null };
 export function useSession() {
   return useQuery({ queryKey: ["session"], queryFn: () => api<AuthSession>("/api/auth/session"), staleTime: 30000, retry: 1 });
 }

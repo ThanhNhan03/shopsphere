@@ -279,6 +279,40 @@ namespace ShopSphere.Inventory.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ShopSphere.Inventory.Domain.StockAdjustment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AvailableAfter")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Delta")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PerformedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId", "CreatedAt");
+
+                    b.ToTable("Adjustments");
+                });
+
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxMessage", b =>
                 {
                     b.HasOne("MassTransit.EntityFrameworkCoreIntegration.OutboxState", null)

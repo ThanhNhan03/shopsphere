@@ -44,6 +44,9 @@ namespace ShopSphere.Catalog.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -51,6 +54,10 @@ namespace ShopSphere.Catalog.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("Price")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -64,8 +71,10 @@ namespace ShopSphere.Catalog.Infrastructure.Persistence.Migrations
                             Category = "Laptops",
                             Description = "A light, powerful laptop for everyday creative work. 13-inch display, 16 GB memory, 256 GB SSD.",
                             ImageUrl = "/products/laptop.svg",
+                            IsActive = true,
                             Name = "MacBook Air M4",
-                            Price = 999m
+                            Price = 999m,
+                            Version = 1
                         },
                         new
                         {
@@ -74,8 +83,10 @@ namespace ShopSphere.Catalog.Infrastructure.Persistence.Migrations
                             Category = "Audio",
                             Description = "Wireless over-ear headphones with noise cancellation and up to 30 hours of battery life.",
                             ImageUrl = "/products/headphones.svg",
+                            IsActive = true,
                             Name = "WH-1000XM5",
-                            Price = 299m
+                            Price = 299m,
+                            Version = 1
                         },
                         new
                         {
@@ -84,8 +95,10 @@ namespace ShopSphere.Catalog.Infrastructure.Persistence.Migrations
                             Category = "Accessories",
                             Description = "A comfortable wireless mouse with quiet clicks, precise scrolling and USB-C charging.",
                             ImageUrl = "/products/mouse.svg",
+                            IsActive = true,
                             Name = "MX Master 3S",
-                            Price = 99m
+                            Price = 99m,
+                            Version = 1
                         },
                         new
                         {
@@ -94,8 +107,10 @@ namespace ShopSphere.Catalog.Infrastructure.Persistence.Migrations
                             Category = "Monitors",
                             Description = "A bright 27-inch 5K display for your desk, with an integrated camera and speakers.",
                             ImageUrl = "/products/monitor.svg",
+                            IsActive = true,
                             Name = "Studio Display",
-                            Price = 1599m
+                            Price = 1599m,
+                            Version = 1
                         },
                         new
                         {
@@ -104,8 +119,10 @@ namespace ShopSphere.Catalog.Infrastructure.Persistence.Migrations
                             Category = "Accessories",
                             Description = "A compact wireless mechanical keyboard with a tactile typing feel and a durable aluminum frame.",
                             ImageUrl = "/products/keyboard.svg",
+                            IsActive = true,
                             Name = "Keychron K2",
-                            Price = 89m
+                            Price = 89m,
+                            Version = 1
                         },
                         new
                         {
@@ -114,8 +131,10 @@ namespace ShopSphere.Catalog.Infrastructure.Persistence.Migrations
                             Category = "Storage",
                             Description = "1 TB of fast, portable storage in a pocket-sized aluminum enclosure.",
                             ImageUrl = "/products/ssd.svg",
+                            IsActive = true,
                             Name = "Portable SSD T7",
-                            Price = 109m
+                            Price = 109m,
+                            Version = 1
                         });
                 });
 #pragma warning restore 612, 618

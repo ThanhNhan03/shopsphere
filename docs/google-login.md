@@ -1,6 +1,6 @@
 # Google / Gmail sign-in
 
-The storefront uses Google OAuth and an HttpOnly, eight-hour server cookie. Gmail accounts use the same Google sign-in button. This does not add a separate email/password account system or request access to the user's mailbox.
+The storefront supports optional Google OAuth alongside [local email/password accounts](admin.md). Both use an HttpOnly, eight-hour server cookie. Gmail accounts use the Google sign-in button; ShopSphere does not request access to the user's mailbox.
 
 ## Local configuration
 
@@ -17,7 +17,7 @@ When changing the frontend port or hostname, update `FRONTEND_URL` and the Googl
 
 - Every Google sign-in requests `prompt=select_account`: choose an existing account or **Use another account**. ShopSphere logout ends the application session, while the browser's Google session remains signed in.
 
-- Browsing products is public. A Google session is required for basket, order and payment operations through Gateway.
+- Browsing products is public. A Google or local account session is required for basket, order and payment operations through Gateway.
 - Basket IDs are derived from Google's stable account ID, rather than email addresses or browser-generated IDs.
 - Gateway checks basket ownership, checkout customer ID, and order ownership before allowing order/payment requests. Google tokens and secrets are not exposed to the browser.
 - State-changing storefront requests must carry the configured storefront Origin. The Stripe webhook retains its signature-based protection.
@@ -32,7 +32,7 @@ Gateway uses sliding 60-second windows, with no request queue:
 | --- | --- |
 | API reads | 120 per signed-in account, or anonymous connection IP |
 | API writes | 30 per signed-in account, or anonymous connection IP |
-| Google sign-in starts | 10 per connection IP |
+| Google sign-in starts / local login / registration | 10 per connection IP, shared bucket |
 | OAuth callbacks | 30 per connection IP |
 | Stripe webhook | 120 per connection IP, in a separate bucket |
 | Overall API connection ceiling | 600 per connection IP; Stripe has a separate ceiling |
@@ -46,9 +46,9 @@ Anonymous requests forwarded by the local Next.js server share that server's con
 
 Verified locally on 2026-10-07 with the configured Google OAuth client: real Google sign-in returns to the storefront, the header displays the account name, reload retains the session, basket writes succeed, checkout pre-fills account name/email, logout removes access, and signing back in restores the same basket and return URL. The walkthrough left one Keychron K2 in the signed-in account's bag; no order or payment was created.
 
-The automated .NET suite has 23 passing tests, including a complete OAuth callback using a fixture backchannel, HttpOnly session creation, logout, anonymous access rejection, ownership checks, and Origin checks. A second real Google account has not been tested.
+The current checked-in .NET suite covers checkout and administration rules. `scripts/admin-smoke-test.mjs` checks real local-account sessions, administrator authorization, and Origin checks against the Docker stack. A second real Google account has not been tested.
 
-Without a configured OAuth client, the login screen reports that sign-in is unconfigured. Gateway must own `/auth-keys` as the non-root application user; the Dockerfile prepares this directory with permissions 700. Existing root-owned volumes need their owner corrected before OAuth can protect state or session cookies.
+Without a configured OAuth client, the login screen offers email/password login and registration. Gateway must own `/auth-keys` as the non-root application user; the Dockerfile prepares this directory with permissions 700. Existing root-owned volumes need their owner corrected before OAuth can protect state or session cookies.
 
 The original anonymous `scripts/smoke-test.mjs` and synthetic webhook script do not authenticate to Gateway. They need an authenticated test-session harness before they can run through the now-protected public endpoints. Do not disable access checks to run those scripts.
 

@@ -54,6 +54,7 @@ export function Checkout() {
   if (!customer) return <SignInPrompt returnUrl="/checkout" />;
   if (basket.isPending) return <Loading />;
   if (basket.error) return <ErrorMessage error={basket.error} />;
+  if (basket.data?.items.some(i => !i.isAvailable)) return <div className="empty"><h1>Some products are unavailable.</h1><p>Remove them from your bag before checking out.</p><Link href="/cart" className="button">Review your bag</Link></div>;
   if (!basket.data?.items.length)
     return (
       <div className="empty">
@@ -121,7 +122,7 @@ export function Checkout() {
             <span className="step-number">01</span>
             <div>
               <h2>Your details</h2>
-              <p>Pre-filled from your Google account. Edit if needed.</p>
+              <p>Pre-filled from your account. Edit if needed.</p>
             </div>
           </div>
           <label htmlFor="customer-name">

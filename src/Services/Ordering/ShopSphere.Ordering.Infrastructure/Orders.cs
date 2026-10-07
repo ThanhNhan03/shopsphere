@@ -28,6 +28,7 @@ public sealed class Orders(OrderingDb db, HttpClient baskets, IPublishEndpoint p
         if (response.StatusCode == System.Net.HttpStatusCode.BadRequest) throw new ApiException(400, "Invalid customer identifier.");
         response.EnsureSuccessStatusCode();
         var basket = await response.Content.ReadFromJsonAsync<BasketSnapshot>(ct) ?? throw new ApiException(409, "Basket unavailable.");
+        Guard.Require(basket.Items.All(i => i.IsAvailable), "Remove unavailable products from your basket before checking out.");
         var order = Order.Create(request.CheckoutId, request.CustomerId, request.CustomerName, request.Email,
             basket.Items.Select(i => new OrderItem { ProductId = i.ProductId, Name = i.Name, UnitPrice = i.UnitPrice, Quantity = i.Quantity }).ToList());
         db.Orders.Add(order);
@@ -39,5 +40,5 @@ public sealed class Orders(OrderingDb db, HttpClient baskets, IPublishEndpoint p
         return order;
     }
     private record BasketSnapshot(BasketLine[] Items);
-    private record BasketLine(Guid ProductId, string Name, decimal UnitPrice, int Quantity);
+    private record BasketLine(Guid ProductId, string Name, decimal UnitPrice, int Quantity, bool IsAvailable);
 }

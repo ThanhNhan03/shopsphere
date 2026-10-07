@@ -9,6 +9,7 @@ public sealed class CatalogDb(DbContextOptions<CatalogDb> options) : DbContext(o
     protected override void OnModelCreating(ModelBuilder model)
     {
         model.Entity<Product>().Property(p => p.Price).HasPrecision(18, 2);
+        model.Entity<Product>().Property(p => p.Version).IsConcurrencyToken();
         model.Entity<Product>().HasData(
             Product(1, "MacBook Air M4", "A light, powerful laptop for everyday creative work. 13-inch display, 16 GB memory, 256 GB SSD.", 999m, "Apple", "Laptops", "laptop"),
             Product(2, "WH-1000XM5", "Wireless over-ear headphones with noise cancellation and up to 30 hours of battery life.", 299m, "Sony", "Audio", "headphones"),
@@ -24,7 +25,7 @@ public sealed class CatalogDb(DbContextOptions<CatalogDb> options) : DbContext(o
 public sealed class CatalogQueries(CatalogDb db) : ICatalog
 {
     public Task<List<Product>> List(string? category, CancellationToken ct) =>
-        db.Products.AsNoTracking().Where(p => category == null || p.Category == category).OrderBy(p => p.Name).ToListAsync(ct);
-    public Task<Product?> Find(Guid id, CancellationToken ct) => db.Products.AsNoTracking().SingleOrDefaultAsync(p => p.Id == id, ct);
-    public Task<List<string>> Categories(CancellationToken ct) => db.Products.Select(p => p.Category).Distinct().Order().ToListAsync(ct);
+        db.Products.AsNoTracking().Where(p => p.IsActive && (category == null || p.Category == category)).OrderBy(p => p.Name).ToListAsync(ct);
+    public Task<Product?> Find(Guid id, CancellationToken ct) => db.Products.AsNoTracking().SingleOrDefaultAsync(p => p.Id == id && p.IsActive, ct);
+    public Task<List<string>> Categories(CancellationToken ct) => db.Products.Where(p => p.IsActive).Select(p => p.Category).Distinct().Order().ToListAsync(ct);
 }

@@ -7,3 +7,6 @@
 **/.env.*
 !**/.env.example
 artifacts
+.local
+.auth-keys
+outputs

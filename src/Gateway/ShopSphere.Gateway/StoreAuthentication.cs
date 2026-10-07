@@ -11,8 +11,13 @@ using Microsoft.AspNetCore.WebUtilities;
 namespace ShopSphere.Gateway;
 public static class StoreAuthentication
 {
-    private const string Scheme = "Store";
+    internal const string Scheme = "Store";
     private static bool Configured(IConfiguration c) => !string.IsNullOrWhiteSpace(c["Google:ClientId"]) && !string.IsNullOrWhiteSpace(c["Google:ClientSecret"]);
+    public static bool IsAdministrator(ClaimsPrincipal user, IConfiguration configuration) =>
+        user.Identity?.IsAuthenticated == true && (user.HasClaim("local_admin", "true") ||
+        (user.FindFirstValue("email_verified") == "true" &&
+        (configuration["Admin:Emails"] ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Contains(user.FindFirstValue(ClaimTypes.Email), StringComparer.OrdinalIgnoreCase)));
     public static void AddStoreAuthentication(this WebApplicationBuilder builder)
     {
         builder.Services.AddDataProtection().SetApplicationName("ShopSphere").PersistKeysToFileSystem(new DirectoryInfo(builder.Configuration["Auth:KeyPath"] ?? ".auth-keys"));
@@ -39,6 +44,8 @@ public static class StoreAuthentication
             {
                 var subject = c.Principal?.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new InvalidOperationException("Missing Google account ID.");
                 ((ClaimsIdentity)c.Principal!.Identity!).AddClaim(new Claim("customer_id", "google-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(subject))).ToLowerInvariant()));
+                if ((c.User.TryGetProperty("verified_email", out var verified) || c.User.TryGetProperty("email_verified", out verified)) && verified.ValueKind == JsonValueKind.True)
+                    ((ClaimsIdentity)c.Principal.Identity!).AddClaim(new Claim("email_verified", "true"));
                 return Task.CompletedTask;
             };
             o.Events.OnRemoteFailure = c => { c.HandleResponse(); c.Response.Redirect("/login?error=google"); return Task.CompletedTask; };
@@ -63,7 +70,7 @@ public static class StoreAuthentication
         });
         app.UseRateLimiter();
         app.UseAuthentication();
-        app.MapGet("/api/auth/session", (HttpContext c) => Results.Json(new { googleEnabled = Configured(app.Configuration), user = c.User.Identity?.IsAuthenticated == true ? new { customerId = c.User.FindFirstValue("customer_id"), name = c.User.FindFirstValue(ClaimTypes.Name), email = c.User.FindFirstValue(ClaimTypes.Email) } : null }));
+        app.MapGet("/api/auth/session", (HttpContext c) => Results.Json(new { googleEnabled = Configured(app.Configuration), user = c.User.Identity?.IsAuthenticated == true ? new { customerId = c.User.FindFirstValue("customer_id"), name = c.User.FindFirstValue(ClaimTypes.Name), email = c.User.FindFirstValue(ClaimTypes.Email), isAdmin = IsAdministrator(c.User, app.Configuration), provider = c.User.FindFirstValue("provider") ?? "google" } : null }));
         app.MapGet("/api/auth/google", (string? returnUrl) =>
         {
             if (!Configured(app.Configuration)) return Results.Redirect("/login?error=configuration");
@@ -77,6 +84,12 @@ public static class StoreAuthentication
             var webhook = path == "/api/payments/webhooks/stripe";
             if (!HttpMethods.IsGet(c.Request.Method) && !HttpMethods.IsHead(c.Request.Method) && !webhook && path.StartsWith("/api/", StringComparison.Ordinal) && c.Request.Headers.Origin.ToString() != publicUrl.GetLeftPart(UriPartial.Authority))
             { await Reject(c, 403, "The request must originate from the store."); return; }
+            if (c.Request.Path.StartsWithSegments("/api/admin"))
+            {
+                if (c.User.Identity?.IsAuthenticated != true) { await Reject(c, 401, "Sign in to access store administration."); return; }
+                if (!IsAdministrator(c.User, app.Configuration)) { await Reject(c, 403, "This account does not have administrator access."); return; }
+                await next(c); return;
+            }
             var protectedPath = c.Request.Path.StartsWithSegments("/api/basket") || c.Request.Path.StartsWithSegments("/api/orders") || (c.Request.Path.StartsWithSegments("/api/payments") && !webhook);
             if (!protectedPath) { await next(c); return; }
             var customer = c.User.FindFirstValue("customer_id");

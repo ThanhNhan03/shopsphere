@@ -70,6 +70,7 @@ export function Cart() {
                     <h3>{item.name}</h3>
                   </Link>
                   <p>{money(item.unitPrice)} each</p>
+                  {!item.isAvailable && <p role="alert">This product is unavailable. Please remove it.</p>}
                   <button
                     className="text-button"
                     disabled={change.isPending}
@@ -90,7 +91,7 @@ export function Cart() {
                   <select
                     id={item.productId}
                     value={item.quantity}
-                    disabled={change.isPending}
+                    disabled={change.isPending || !item.isAvailable}
                     onChange={(e) =>
                       change.mutate({
                         productId: item.productId,
@@ -129,12 +130,12 @@ export function Cart() {
               </span>
               <strong>{money(basket.data.total)}</strong>
             </div>
-            <Link href="/checkout" className="button full">
+            {basket.data.items.some(i => !i.isAvailable) ? <p role="alert">Remove unavailable products to continue.</p> : <Link href="/checkout" className="button full">
               Continue to checkout <Icon name="arrow" />
-            </Link>
+            </Link>}
             <p className="summary-footnote">
               <Icon name="shield" size={16} />
-              Google account protected
+              Account protected
             </p>
             <p className="fineprint">
               This is a demo purchase. No physical items will be shipped.

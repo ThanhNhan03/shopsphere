@@ -12,7 +12,8 @@ export function ProductImage({
   large?: boolean;
   category?: string;
 }) {
-  const icon = resolveDeviceIcon(src, category);
+  const uploaded = src?.startsWith("/api/media/");
+  const icon = uploaded ? src : resolveDeviceIcon(src, category);
   if (!icon)
     return (
       <div
@@ -31,6 +32,7 @@ export function ProductImage({
       height={large ? 480 : 300}
       className="product-image"
       priority={large}
+      unoptimized={uploaded}
     />
   );
 }

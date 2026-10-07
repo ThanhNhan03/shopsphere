@@ -8,4 +8,6 @@ public sealed class Product
     public string ImageUrl { get; set; } = "";
     public string Brand { get; set; } = "";
     public string Category { get; set; } = "";
+    public bool IsActive { get; set; } = true;
+    public int Version { get; set; } = 1;
 }

@@ -20,9 +20,9 @@ public sealed class RedisBaskets(IConnectionMultiplexer redis, HttpClient catalo
         var items = new List<BasketItem>();
         foreach (var entry in entries.OrderBy(e => e.Name.ToString()))
         {
-            var product = await catalog.GetFromJsonAsync<CatalogProduct>($"/api/products/{entry.Name}", ct)
+            var product = await catalog.GetFromJsonAsync<CatalogProduct>($"/internal/products/{entry.Name}", ct)
                 ?? throw new ApiException(409, "A basket product is no longer available.");
-            items.Add(new(product.Id, product.Name, product.Price, (int)entry.Value, product.ImageUrl));
+            items.Add(new(product.Id, product.Name, product.Price, (int)entry.Value, product.ImageUrl, product.IsActive));
         }
         return new(customer, items.ToArray());
     }
@@ -60,5 +60,5 @@ public sealed class RedisBaskets(IConnectionMultiplexer redis, HttpClient catalo
         if (product is { } id) await Db.HashDeleteAsync(Key(customer), id.ToString());
         else await Db.KeyDeleteAsync(Key(customer));
     }
-    private record CatalogProduct(Guid Id, string Name, decimal Price, string ImageUrl);
+    private record CatalogProduct(Guid Id, string Name, decimal Price, string ImageUrl, bool IsActive);
 }

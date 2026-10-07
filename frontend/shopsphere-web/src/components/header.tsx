@@ -43,6 +43,7 @@ export function Header() {
           <Link href="/?category=Accessories#collection">Desk essentials</Link>
         </nav>
         <div className="header-actions">
+          {session.data?.user?.isAdmin && <Link href="/admin" className="sign-in-link">Admin</Link>}
           {session.data?.user ? (
             <div className="account-menu">
               <Link

@@ -19,7 +19,7 @@ export function SignInPrompt({ returnUrl }: { returnUrl: string }) {
         Your shopping bag.
       </h1>
       <p>
-        Sign in with Google to save your picks
+        Sign in to save your picks
         <br />
         and keep your orders in one place.
       </p>

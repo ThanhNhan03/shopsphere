@@ -1,6 +1,6 @@
 # ShopSphere
 
-A technology e-commerce demo with .NET 10 microservices, Clean Architecture, Next.js, PostgreSQL, Redis, RabbitMQ/MassTransit, Stripe Checkout, YARP, and Serilog/Seq.
+A technology e-commerce demo with .NET 10 microservices, Clean Architecture, Next.js, PostgreSQL, Redis, RabbitMQ/MassTransit, Stripe Checkout, YARP, MinIO/S3 product images, and Serilog/Seq.
 
 ## Run locally
 
@@ -8,17 +8,23 @@ Install Docker Desktop with Linux containers, then:
 
 ```powershell
 Copy-Item .env.example .env
+./scripts/setup-local-admin.ps1
 docker compose up -d --build
 ```
 
-Open [the store](http://localhost:3000). Compose creates four service-owned databases, applies committed EF Core migrations and seeds six products with 20 units each. First startup downloads and builds the images.
+Open [the store](http://localhost:3000). Compose creates five databases (including Gateway accounts), applies committed EF Core migrations and seeds six products with 20 units each on a fresh database. First startup downloads and builds the images. Keep an existing `.env` instead of copying over it.
 
-Google/Gmail sign-in is required for the bag, checkout, orders and payments. Configure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` as described in [Google sign-in setup](docs/google-login.md). Browsing products remains public.
+Register at `/register` or sign in at `/login` with email and password. Sign-in is required for the bag, checkout, orders and payments; browsing remains public. Google/Gmail is an optional alternative: configure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` as described in [Google sign-in setup](docs/google-login.md).
+
+Open `/admin` with the seeded `admin@shopsphere.local` account. The setup script generates a strong random password and saves the account details in Git-ignored `.local/admin-account.txt`. Admin can create/edit/show/hide products, upload photos, adjust stock with reasons/history, and review orders and confirmed revenue. See [administration and storage](docs/admin.md).
 
 | Component | Local address |
 | --- | --- |
 | Store | http://localhost:3000 |
 | API gateway | http://localhost:8080 |
+| Administration | http://localhost:3000/admin |
+| MinIO console | http://localhost:9001 |
+| MinIO S3 API | http://localhost:9000 |
 | RabbitMQ management | http://localhost:15672 |
 | Seq logs | http://localhost:8081 |
 | PostgreSQL | localhost:6543 |
@@ -126,10 +132,10 @@ Substitute the owning service. Design-time factories create migration models wit
 With the stack running in Demo mode:
 
 ```powershell
-node scripts/smoke-test.mjs
+node --env-file=.env scripts/admin-smoke-test.mjs
 ```
 
-The smoke check exercises real HTTP, PostgreSQL, Redis and RabbitMQ, including concurrent checkout retries, duplicate settlement, insufficient inventory and compensation. It consumes one SSD per successful run and uses isolated customer IDs.
+The authenticated smoke check exercises registration/login/logout, administrator authorization, MinIO image replacement, visibility, concurrent edit protection, stock adjustment history, concurrent checkout retries and order confirmation. It uses an isolated customer/product/order, then hides the test product and clears its available stock. The test account and order remain in history. The original anonymous `smoke-test.mjs` and webhook harness need authentication updates; do not disable Gateway authorization to run them.
 
 Signed webhook fixtures can be checked without a Stripe account:
 
@@ -145,7 +151,7 @@ GitHub Actions runs backend tests, Compose validation, frontend lint and fronten
 
 ## Scope and limitations
 
-Google sign-in and Gateway ownership checks protect the storefront's basket, orders and payment operations. Internal services must remain private to the Docker network. Fulfillment, shipping, tax, admin, reviews, promotions and email delivery remain outside scope. Notification may log duplicate messages after redelivery; it sends no actual email.
+Email/password and optional Google sign-in plus Gateway ownership checks protect the storefront's basket, orders and payment operations. Gateway enforces administrator access and replaces client-supplied audit identity headers. Internal services must remain private to the Docker network. Fulfillment, shipping, tax, reviews, promotions and email delivery remain outside scope. Notification may log duplicate messages after redelivery; it sends no actual email. Email verification, password recovery and account/role administration are not implemented.
 
 Stock is held while awaiting payment. Started Stripe sessions rely on webhooks to expire; webhook delivery/reconciliation must be monitored before a real deployment. Demo checkouts can be settled directly from the order page.
 

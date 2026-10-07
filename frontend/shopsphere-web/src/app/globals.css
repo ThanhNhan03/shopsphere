@@ -1,4 +1,10 @@
 @import "tailwindcss";
+.account-form { display: grid; gap: 18px; margin-top: 25px; }
+.account-form label { display: grid; gap: 8px; font-size: 12px; font-weight: 600; }
+.account-form input { width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: white; font: inherit; font-weight: 400; }
+.auth-divider { text-align: center; font-size: 11px; color: var(--muted); margin: 20px 0; }
+.auth-card .account-switch { margin: 18px 0; font-size: 12px; text-align: center; }
+.account-switch a { color: var(--accent); text-decoration: underline; }
 @font-face {
   font-family: Manrope;
   src: url("/fonts/manrope-400.ttf") format("truetype");

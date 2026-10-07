@@ -46,6 +46,10 @@ services:
       Google__ClientId: ${GOOGLE_CLIENT_ID:-}
       Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:-}
       Auth__KeyPath: /auth-keys
+      ConnectionStrings__Database: Host=postgres;Port=5432;Database=identity_db;Username=${POSTGRES_USER:-shopsphere};Password=${POSTGRES_PASSWORD:-shopsphere-local}
+      Admin__Emails: ${ADMIN_EMAILS:-}
+      Admin__BootstrapEmail: ${ADMIN_BOOTSTRAP_EMAIL:-admin@shopsphere.local}
+      Admin__BootstrapPassword: ${ADMIN_BOOTSTRAP_PASSWORD:-}
       RateLimiting__ReadPermitLimit: ${RATE_LIMIT_READ:-120}
       RateLimiting__WritePermitLimit: ${RATE_LIMIT_WRITE:-30}
       RateLimiting__LoginPermitLimit: ${RATE_LIMIT_LOGIN:-10}
@@ -54,6 +58,8 @@ services:
     ports:
       - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
     depends_on:
+      postgres-init:
+        condition: service_completed_successfully
       catalog-api:
         condition: service_healthy
       basket-api:
@@ -75,6 +81,11 @@ services:
     environment:
       <<: *common
       ConnectionStrings__Database: Host=postgres;Port=5432;Database=catalog_db;Username=${POSTGRES_USER:-shopsphere};Password=${POSTGRES_PASSWORD:-shopsphere-local}
+      S3__Endpoint: http://minio:9000
+      S3__AccessKey: ${MINIO_ROOT_USER:-shopsphere}
+      S3__SecretKey: ${MINIO_ROOT_PASSWORD:-shopsphere-minio-local}
+      S3__Bucket: ${S3_BUCKET:-shopsphere-products}
+      S3__Region: us-east-1
     depends_on:
       postgres-init:
         condition: service_completed_successfully
@@ -124,6 +135,7 @@ services:
     environment:
       <<: *common
       ConnectionStrings__Database: Host=postgres;Port=5432;Database=inventory_db;Username=${POSTGRES_USER:-shopsphere};Password=${POSTGRES_PASSWORD:-shopsphere-local}
+      Services__Catalog: http://catalog-api:8080
     depends_on:
       <<: *data-dependencies
 
@@ -154,6 +166,23 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+
+  minio:
+    build: ./infra/minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-shopsphere}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-shopsphere-minio-local}
+    ports:
+      - "127.0.0.1:${MINIO_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
 
   postgres:
     image: postgres:18-alpine
@@ -231,6 +260,7 @@ services:
       - seq-data:/data
 
 volumes:
+  minio-data:
   auth-keys:
   postgres-data:
   redis-data:

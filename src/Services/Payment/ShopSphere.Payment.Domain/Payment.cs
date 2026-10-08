@@ -14,6 +14,9 @@ public sealed class Payment
     public PaymentStatus Status { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? CompletedAt { get; set; }
+    public bool CanReuseCheckout(string mode) => CheckoutUrl is not null &&
+        (mode == "Demo" ? StripeSessionId?.StartsWith("demo_", StringComparison.Ordinal) == true :
+            mode == "Stripe" && StripeSessionId?.StartsWith("cs_", StringComparison.Ordinal) == true);
     public bool Settle(bool paid)
     {
         if (Status is PaymentStatus.Completed or PaymentStatus.Failed or PaymentStatus.Cancelled) return false;

@@ -9,7 +9,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, json, money } from "@/lib/api";
 import { ErrorMessage, Loading } from "@/components/feedback";
 import type { Order, Payment } from "@/types";
-export function OrderDetail({ id }: { id: string }) {
+export function OrderDetail({ id, checkoutClosed = false }: { id: string; checkoutClosed?: boolean }) {
   const client = useQueryClient();
   const customer = useCustomer();
   const order = useQuery({
@@ -96,9 +96,11 @@ export function OrderDetail({ id }: { id: string }) {
             />
             <span>
               {o.status === "Confirmed"
-                ? "Payment received. Your demo order is confirmed."
+                ? "Payment received. Your order is confirmed."
                 : o.status === "Cancelled"
                   ? o.cancellationReason
+                  : checkoutClosed && payment.data?.mode === "Stripe"
+                    ? "Checkout was closed. Your items remain reserved; resume payment while the session is open, or wait for expiry to release them."
                   : payment.data
                     ? "Your items are reserved. Complete payment to confirm your order."
                     : "We’re checking availability and reserving your items…"}
@@ -156,7 +158,7 @@ export function OrderDetail({ id }: { id: string }) {
                 </>
               ) : (
                 <>
-                  <p>Pay securely with Stripe Checkout in test mode.</p>
+                  <p>Pay securely with Stripe Checkout in test mode. No real money is charged.</p>
                   <button
                     className="button full"
                     disabled={start.isPending}
@@ -164,7 +166,7 @@ export function OrderDetail({ id }: { id: string }) {
                   >
                     {start.isPending
                       ? "Opening checkout…"
-                      : "Continue to Stripe →"}
+                      : payment.data.checkoutUrl ? "Resume Stripe Checkout →" : "Continue to Stripe →"}
                   </button>
                   <p className="fineprint">
                     Returning from Stripe does not confirm payment. This page

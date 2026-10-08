@@ -167,7 +167,7 @@ export function Checkout() {
             </p>
           ) : (
             <p id="email-hint" className="input-hint">
-              We’ll attach this email to your demo order.
+              We’ll attach this email to your order.
             </p>
           )}
           <div className="checkout-explainer">

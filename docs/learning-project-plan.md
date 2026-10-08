@@ -2,6 +2,8 @@
 
 Ngày đối chiếu: 07/10/2026. Đây là kế hoạch đề xuất, chưa phải các thay đổi đã triển khai.
 
+Mốc triển khai tiếp theo cùng ngày: theo yêu cầu mới, đã nạp 1.000.000 sản phẩm và tồn kho tương ứng, thêm backend search/category/sort/pagination cùng UI chuyển trang. Quy mô này thay thế đề xuất seed 500–1.000 sản phẩm bên dưới. Exact brand/price filters, performance indexes, cache và concurrent load test vẫn chưa triển khai; xem `catalog-dataset.md` và `validation.md` cho kết quả thực tế.
+
 ## Căn cứ và cách đọc trạng thái
 
 - Nguồn học: `C:/Users/Admin/Downloads/schedule_fast_track.xlsx`, sheet `Sheet1`. File liệt kê chương trình Week 1–5, không ghi nhận buổi nào Hung đã hoàn thành. Vì vậy, “theo kiến thức đã học” trong kế hoạch được hiểu là đối chiếu với nội dung lịch học; không suy ra tiến độ học cá nhân.
@@ -15,7 +17,7 @@ Ngày đối chiếu: 07/10/2026. Đây là kế hoạch đề xuất, chưa ph�
 
 | Hạng mục | Hiện tại | Việc còn cần làm | Mức cần thiết |
 |---|---|---|---|
-| Danh mục, danh sách, chi tiết sản phẩm | Có API, 6 sản phẩm seed và UI | Search, filter giá/brand, sort, phân trang ở server; bộ dữ liệu lớn hơn | Cốt lõi; là nền cho SQL/cache |
+| Danh mục, danh sách, chi tiết sản phẩm | Có 1.000.000 sản phẩm, backend search/category/sort/pagination và UI | Exact filter giá/brand; tối ưu truy vấn theo workload và load test | Cốt lõi; là nền cho SQL/cache |
 | Hình ảnh các dòng thiết bị | Có registry SVG chung và fallback | Dùng lại theo loại thiết bị khi thêm sản phẩm | Giữ cách hiện tại; không cần ảnh riêng cho từng SKU |
 | Giỏ hàng | Redis, TTL, giới hạn số lượng, thao tác atomic | Giảm nhiều lượt gọi Catalog khi đọc giỏ; thêm integration test | Cốt lõi |
 | Đăng nhập và dữ liệu cá nhân | Google OAuth/cookie, chọn tài khoản, ownership check | IAM bằng Keycloak/OIDC/JWT để bám bài học; giữ liên kết tài khoản cũ | Cần cho coverage IAM/JWT/Keycloak |

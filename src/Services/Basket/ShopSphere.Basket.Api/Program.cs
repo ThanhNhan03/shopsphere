@@ -10,6 +10,11 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
     ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379"));
 builder.Services.AddHttpClient<IBaskets, RedisBaskets>(c =>
     c.BaseAddress = new Uri(builder.Configuration["Services:Catalog"] ?? "http://localhost:5101"));
+builder.Services.AddHttpClient<IStockAvailability, InventoryAvailability>(c =>
+{
+    c.BaseAddress = new Uri(builder.Configuration["Services:Inventory"] ?? "http://localhost:5104");
+    c.Timeout = TimeSpan.FromSeconds(5);
+});
 builder.Services.AddMassTransit(x =>
 {
     x.AddConsumer<BasketConfirmedConsumer>();

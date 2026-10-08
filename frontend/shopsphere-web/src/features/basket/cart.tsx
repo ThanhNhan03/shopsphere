@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { SignInPrompt } from "@/components/sign-in-prompt";
 import {
   useBasket,
@@ -10,14 +11,16 @@ import { ProductImage } from "@/components/product-image";
 import { ErrorMessage, Loading } from "@/components/feedback";
 import { CheckoutSteps } from "@/components/checkout-steps";
 import { Icon } from "@/components/icon";
+import { BagQuantity } from "@/components/bag-quantity";
 import { money } from "@/lib/api";
 export function Cart() {
   const basket = useBasket();
   const change = useBasketChange();
   const customer = useCustomer();
+  const router = useRouter();
   if (!customer) return <SignInPrompt returnUrl="/cart" />;
   if (basket.isPending) return <Loading />;
-  if (basket.error) return <ErrorMessage error={basket.error} />;
+  if (basket.error && !basket.data) return <ErrorMessage error={basket.error} />;
   const count = basket.data?.items.reduce((s, i) => s + i.quantity, 0) || 0;
   return (
     <>
@@ -39,6 +42,7 @@ export function Cart() {
         </Link>
       </div>
       <ErrorMessage error={change.error} />
+      <ErrorMessage error={basket.error} />
       {!basket.data?.items.length ? (
         <div className="empty">
           <span className="empty-icon">
@@ -55,7 +59,7 @@ export function Cart() {
           <div className="bag-items">
             <div className="bag-table-head">
               <span>PRODUCT</span>
-              <span>QUANTITY / TOTAL</span>
+              <span>UNIT PRICE / QUANTITY / ITEM TOTAL</span>
             </div>
             {basket.data.items.map((item) => (
               <div className="cart-row" key={item.productId}>
@@ -69,11 +73,17 @@ export function Cart() {
                   <Link href={`/products/${item.productId}`}>
                     <h3>{item.name}</h3>
                   </Link>
-                  <p>{money(item.unitPrice)} each</p>
-                  {!item.isAvailable && <p role="alert">This product is unavailable. Please remove it.</p>}
+                  {!item.isAvailable ? <p role="alert">This product is unavailable. Please remove it.</p> : item.availableQuantity <= 5 || item.quantity > item.availableQuantity ? (
+                    <p className={`cart-stock-status${item.quantity > item.availableQuantity ? " unavailable" : ""}`}>
+                      {item.availableQuantity === 0 ? "Out of stock. Remove this item to continue."
+                        : item.quantity > item.availableQuantity ? `Only ${item.availableQuantity} available. Reduce your quantity.`
+                        : `Only ${item.availableQuantity} left in stock.`}
+                    </p>
+                  ) : null}
                   <button
-                    className="text-button"
+                    className="text-button bag-action"
                     disabled={change.isPending}
+                    data-pending={change.isPending || undefined}
                     onClick={() =>
                       change.mutate({
                         productId: item.productId,
@@ -85,26 +95,32 @@ export function Cart() {
                   </button>
                 </div>
                 <div className="cart-quantity">
-                  <label className="sr-only" htmlFor={item.productId}>
-                    Quantity for {item.name}
-                  </label>
-                  <select
-                    id={item.productId}
-                    value={item.quantity}
-                    disabled={change.isPending || !item.isAvailable}
-                    onChange={(e) =>
+                  <div className="cart-unit-price">
+                    <span className="quantity-caption">Unit price</span>
+                    <strong>{money(item.unitPrice)}</strong>
+                  </div>
+                  <BagQuantity
+                    quantity={
+                      change.isPending && change.variables?.productId === item.productId
+                        && change.variables.method === "PUT"
+                        ? change.variables.quantity ?? item.quantity : item.quantity
+                    }
+                    productName={item.name}
+                    disabled={change.isPending || !item.isAvailable || item.availableQuantity === 0}
+                    busy={change.isPending && change.variables?.productId === item.productId}
+                    maximum={item.availableQuantity}
+                    onChange={(quantity) =>
                       change.mutate({
                         productId: item.productId,
-                        quantity: Number(e.target.value),
+                        quantity,
                         method: "PUT",
                       })
                     }
-                  >
-                    {Array.from({ length: 99 }, (_, i) => (
-                      <option key={i + 1}>{i + 1}</option>
-                    ))}
-                  </select>
-                  <strong>{money(item.unitPrice * item.quantity)}</strong>
+                  />
+                  <div className="cart-line-total">
+                    <span className="quantity-caption">Item total</span>
+                    <strong>{money(item.unitPrice * item.quantity)}</strong>
+                  </div>
                 </div>
               </div>
             ))}
@@ -130,9 +146,15 @@ export function Cart() {
               </span>
               <strong>{money(basket.data.total)}</strong>
             </div>
-            {basket.data.items.some(i => !i.isAvailable) ? <p role="alert">Remove unavailable products to continue.</p> : <Link href="/checkout" className="button full">
+            {!basket.data.canCheckout && (
+              <p className="field-error" role="status">Adjust or remove unavailable items before checking out.</p>
+            )}
+            <button type="button" className="button full bag-action"
+              disabled={change.isPending || !basket.data.canCheckout || !!basket.error}
+              data-pending={(change.isPending && basket.data.canCheckout && !basket.error) || undefined}
+              onClick={() => router.push("/checkout")}>
               Continue to checkout <Icon name="arrow" />
-            </Link>}
+            </button>
             <p className="summary-footnote">
               <Icon name="shield" size={16} />
               Account protected

@@ -30,6 +30,9 @@ public sealed class InventoryCreatedConsumer(InventoryDb db, IPublishEndpoint pu
             foreach (var item in lines)
             {
                 stocks[item.ProductId].Reserve(item.Quantity);
+                var updated = stocks[item.ProductId];
+                await publish.Publish(new StockAvailabilityChangedIntegrationEvent(Guid.NewGuid(), m.CorrelationId,
+                    DateTimeOffset.UtcNow, updated.ProductId, updated.AvailableQuantity, updated.Version), ct);
                 reservation.Items.Add(new() { OrderId = m.OrderId, ProductId = item.ProductId, Quantity = item.Quantity });
             }
             await publish.Publish(new InventoryReservedIntegrationEvent(Guid.NewGuid(), m.CorrelationId, DateTimeOffset.UtcNow, m.OrderId, m.Email, m.TotalAmount, m.Items), ct);
@@ -37,7 +40,7 @@ public sealed class InventoryCreatedConsumer(InventoryDb db, IPublishEndpoint pu
         await db.SaveChangesAsync(ct);
     }
 }
-public sealed class ReservationTransitions(InventoryDb db)
+public sealed class ReservationTransitions(InventoryDb db, IPublishEndpoint publish)
 {
     public async Task Apply(Guid orderId, bool commit, CancellationToken ct)
     {
@@ -48,6 +51,8 @@ public sealed class ReservationTransitions(InventoryDb db)
         {
             var stock = await db.Stocks.FromSqlInterpolated($"SELECT * FROM \"Stocks\" WHERE \"ProductId\" = {item.ProductId} FOR UPDATE").SingleAsync(ct);
             if (commit) stock.Commit(item.Quantity); else stock.Release(item.Quantity);
+            await publish.Publish(new StockAvailabilityChangedIntegrationEvent(Guid.NewGuid(), orderId,
+                DateTimeOffset.UtcNow, stock.ProductId, stock.AvailableQuantity, stock.Version), ct);
         }
         reservation.Status = commit ? "Committed" : "Released";
         await db.SaveChangesAsync(ct);

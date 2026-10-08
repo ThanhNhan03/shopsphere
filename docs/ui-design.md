@@ -24,14 +24,14 @@ The requested local UI/UX Pro Max skill was read from `E:/ui-ux-pro-max-skill/.c
 
 ## Flows
 
-- Home: featured product, actual brand names, category counts, name/brand search, price sorting, real empty results, product cards and an audio collection link.
-- Product: product image, price, bounded quantity controls, add-to-bag feedback and checkout information.
+- Home: featured product, actual brand names, name/brand search, price sorting, available products by default, an explicit Include out of stock checkbox, real empty results and an audio collection link. Cards use a page-level live stock batch, clear availability text and disabled unavailable/unknown purchase actions. Existing bag capacity is reflected with a Review your bag link.
+- Product: product image, price, live stock availability, quantity controls bounded by available stock, add-to-bag feedback and checkout information.
 - Authentication: Google sign-in, account state, different-account action, signed-out prompts and cancellation feedback.
-- Bag: editable quantities, server basket totals, saved-account context and a clear checkout summary.
+- Bag: Unit price, Quantity and Item total appear in that order, with server-confirmed totals. Minus/input/plus controls support direct entry, 1–99 bounds capped by live availability, keyboard commit/cancel and a fixed `Quantity` caption during updates. Buttons retain focus/appearance during requests and use guarded `aria-disabled` states; the input becomes read-only. A separate screen-reader announcement identifies updates. Returned server baskets update the existing view. Low/out-of-stock messages and checkout eligibility expose availability changes. On narrow screens unit price sits above the quantity/line-total pair below product information.
 - Checkout: visible progress, account-prefilled details, inline blur/submit validation and focus on the first invalid field.
 - Order/payment: progress, status, order details and existing Demo/Stripe actions.
 - Shared states: loading, API errors, empty bag/search and not-found/payment-link recovery.
 
-No reviews, discount claims, delivery promises, product stock counts or new commercial functionality were invented. Authentication/payment contracts are retained. Fonts are served locally; their OFL license is in `frontend/shopsphere-web/public/fonts/OFL.txt`.
+No reviews, discount claims or delivery promises were invented. Stock counts come from the Inventory API. Authentication/payment contracts are retained. Fonts are served locally; their OFL license is in `frontend/shopsphere-web/public/fonts/OFL.txt`.
 
 Product imagery uses reusable device illustrations from `public/products/`: laptop, headphones, mouse, monitor, keyboard and SSD. `src/lib/device-icons.ts` is the shared registry. Multiple products of the same device type reuse the same icon; no individual model photograph is required. Catalog/basket `imageUrl` identifies the device icon (for example `/products/keyboard.svg`). Known categories also provide a fallback; unknown device types show a generic box icon until a type is registered. Home and sign-in banners reuse this registry. The typography consistency correction remains in place.

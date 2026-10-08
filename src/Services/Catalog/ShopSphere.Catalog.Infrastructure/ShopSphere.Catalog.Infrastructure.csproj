@@ -2,6 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="../ShopSphere.Catalog.Application/ShopSphere.Catalog.Application.csproj" />
     <ProjectReference Include="../../../BuildingBlocks/ShopSphere.Messaging/ShopSphere.Messaging.csproj" />
+    <ProjectReference Include="../../../../contracts/ShopSphere.Contracts/ShopSphere.Contracts.csproj" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <PackageReference Include="AWSSDK.S3" />
   </ItemGroup>

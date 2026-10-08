@@ -11,6 +11,7 @@ public sealed class Payment
     public string? StripeSessionId { get; set; }
     public string? StripePaymentIntentId { get; set; }
     public string? CheckoutUrl { get; set; }
+    public bool IsLive { get; set; }
     public PaymentStatus Status { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? CompletedAt { get; set; }

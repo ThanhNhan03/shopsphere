@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +16,9 @@ public sealed class Account
     public string PasswordHash { get; set; } = "";
     public bool IsAdmin { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public string? GoogleSubjectHash { get; set; }
+    public string? GooglePictureUrl { get; set; }
+    public DateTimeOffset? GoogleLastLoginAt { get; set; }
 }
 public sealed class AccountsDb(DbContextOptions<AccountsDb> options) : DbContext(options)
 {
@@ -23,6 +28,9 @@ public sealed class AccountsDb(DbContextOptions<AccountsDb> options) : DbContext
         model.Entity<Account>().HasIndex(a => a.Email).IsUnique();
         model.Entity<Account>().Property(a => a.Email).HasMaxLength(254);
         model.Entity<Account>().Property(a => a.Name).HasMaxLength(100);
+        model.Entity<Account>().Property(a => a.GoogleSubjectHash).HasMaxLength(64);
+        model.Entity<Account>().Property(a => a.GooglePictureUrl).HasMaxLength(2048);
+        model.Entity<Account>().HasIndex(a => a.GoogleSubjectHash).IsUnique().HasFilter("\"GoogleSubjectHash\" IS NOT NULL");
     }
 }
 public sealed class AccountsDbFactory : IDesignTimeDbContextFactory<AccountsDb>
@@ -58,9 +66,51 @@ public sealed class Accounts(AccountsDb db)
         Guard.Require(input.Email is { Length: > 0 and <= 254 } && input.Password is { Length: > 0 and <= 128 }, "Email and password are required.");
         var email = input.Email.Trim().ToLowerInvariant();
         var account = await db.Accounts.SingleOrDefaultAsync(a => a.Email == email, ct);
-        var result = Hasher.VerifyHashedPassword(account ?? new Account(), account?.PasswordHash ?? DummyHash, input.Password);
-        if (account is null || result == PasswordVerificationResult.Failed) throw new ApiException(401, "The email or password is incorrect.");
+        var hasPassword = !string.IsNullOrWhiteSpace(account?.PasswordHash);
+        var result = Hasher.VerifyHashedPassword(account ?? new Account(), hasPassword ? account!.PasswordHash : DummyHash, input.Password);
+        if (account is null || !hasPassword || result == PasswordVerificationResult.Failed) throw new ApiException(401, "The email or password is incorrect.");
         if (result == PasswordVerificationResult.SuccessRehashNeeded) { account.PasswordHash = Hasher.HashPassword(account, input.Password); await db.SaveChangesAsync(ct); }
+        return account;
+    }
+    public static string GoogleSubjectDigest(string subject) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(subject))).ToLowerInvariant();
+    public async Task<Account> SignInWithGoogle(string subject, string email, string name, string? pictureUrl, bool emailVerified, CancellationToken ct)
+    {
+        Guard.Require(!string.IsNullOrWhiteSpace(subject) && subject.Length <= 255, "Google did not return a valid account identifier.");
+        Guard.Require(emailVerified, "Verify your Google email before signing in to ShopSphere.");
+        var normalizedEmail = NormalizeEmail(email);
+        var digest = GoogleSubjectDigest(subject);
+        var nameValue = string.IsNullOrWhiteSpace(name) ? normalizedEmail : name.Trim();
+        Guard.Require(nameValue.Length <= 100, "Google profile name is too long.");
+        var safePicture = Uri.TryCreate(pictureUrl, UriKind.Absolute, out var picture) && picture.Scheme == Uri.UriSchemeHttps && picture.AbsoluteUri.Length <= 2048
+            ? picture.AbsoluteUri : null;
+
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({digest}))", ct);
+        var account = await db.Accounts.SingleOrDefaultAsync(a => a.GoogleSubjectHash == digest, ct);
+        if (account is null)
+        {
+            account = await db.Accounts.SingleOrDefaultAsync(a => a.Email == normalizedEmail, ct);
+            if (account is null)
+            {
+                account = new Account { Email = normalizedEmail, Name = nameValue };
+                db.Accounts.Add(account);
+            }
+            else if (account.GoogleSubjectHash is not null && account.GoogleSubjectHash != digest)
+            {
+                throw new ApiException(409, "This email is already linked to another Google account.");
+            }
+            account.GoogleSubjectHash = digest;
+        }
+
+        var emailOwner = await db.Accounts.SingleOrDefaultAsync(a => a.Email == normalizedEmail, ct);
+        if (emailOwner is not null && emailOwner.Id != account.Id)
+            throw new ApiException(409, "This Google email is already linked to another ShopSphere account.");
+        account.Email = normalizedEmail;
+        account.Name = nameValue;
+        account.GooglePictureUrl = safePicture;
+        account.GoogleLastLoginAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return account;
     }
     public async Task SeedAdministrator(IConfiguration configuration, CancellationToken ct)
@@ -79,11 +129,11 @@ public sealed class Accounts(AccountsDb db)
         admin.PasswordHash = Hasher.HashPassword(admin, password);
         db.Accounts.Add(admin); await db.SaveChangesAsync(ct);
     }
-    public static Task StartSession(HttpContext context, Account account) => context.SignInAsync(StoreAuthentication.Scheme,
+    public static Task StartSession(HttpContext context, Account account, string provider = "local", string? customerId = null) => context.SignInAsync(StoreAuthentication.Scheme,
         new ClaimsPrincipal(new ClaimsIdentity(new[]
         {
             new Claim(ClaimTypes.NameIdentifier, account.Id.ToString()), new Claim(ClaimTypes.Name, account.Name), new Claim(ClaimTypes.Email, account.Email),
-            new Claim("customer_id", "local-" + account.Id.ToString("N")), new Claim("provider", "local"), new Claim("local_admin", account.IsAdmin ? "true" : "false")
+            new Claim("customer_id", customerId ?? "local-" + account.Id.ToString("N")), new Claim("provider", provider), new Claim("local_admin", account.IsAdmin ? "true" : "false")
         }, StoreAuthentication.Scheme)));
 }
 public static class AccountEndpoints

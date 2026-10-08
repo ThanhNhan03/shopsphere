@@ -7,6 +7,8 @@ x-app: &app
     ASPNETCORE_HTTP_PORTS: "8080"
     Seq__Url: http://seq:5341
     RabbitMq__Host: rabbitmq
+    RabbitMq__Port: ${RABBITMQ_INTERNAL_PORT:-5672}
+    RabbitMq__UseSsl: ${RABBITMQ_USE_SSL:-false}
     RabbitMq__Username: ${RABBITMQ_USER:-shopsphere}
     RabbitMq__Password: ${RABBITMQ_PASSWORD:-shopsphere-local}
 
@@ -171,7 +173,20 @@ services:
       args:
         PROJECT: src/Workers/ShopSphere.Notification.Worker/ShopSphere.Notification.Worker.csproj
         ASSEMBLY: ShopSphere.Notification.Worker
+    environment:
+      <<: *common
+      ConnectionStrings__Database: Host=postgres;Port=5432;Database=notification_db;Username=${POSTGRES_USER:-shopsphere};Password=${POSTGRES_PASSWORD:-shopsphere-local}
+      Email__Mode: ${EMAIL_MODE:-Console}
+      Email__Smtp__Host: ${SMTP_HOST:-}
+      Email__Smtp__Port: ${SMTP_PORT:-587}
+      Email__Smtp__Security: ${SMTP_SECURITY:-StartTls}
+      Email__Smtp__Username: ${SMTP_USERNAME:-}
+      Email__Smtp__Password: ${SMTP_PASSWORD:-}
+      Email__Smtp__FromAddress: ${SMTP_FROM_ADDRESS:-}
+      Email__Smtp__FromName: ${SMTP_FROM_NAME:-ShopSphere}
     depends_on:
+      postgres-init:
+        condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
 

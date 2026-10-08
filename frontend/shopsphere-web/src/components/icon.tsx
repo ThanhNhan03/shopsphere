@@ -2,6 +2,7 @@ export type IconName =
   | "arrow"
   | "arrow-up"
   | "bag"
+  | "card"
   | "search"
   | "user"
   | "logout"
@@ -21,6 +22,12 @@ const paths: Record<IconName, React.ReactNode> = {
     <>
       <path d="M5 7h14l1 14H4L5 7Z" />
       <path d="M8 8V6a4 4 0 0 1 8 0v2" />
+    </>
+  ),
+  card: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 10h18M7 15h3" />
     </>
   ),
   search: (

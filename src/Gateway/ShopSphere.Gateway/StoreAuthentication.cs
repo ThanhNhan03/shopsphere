@@ -1,6 +1,4 @@
 using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -25,7 +23,8 @@ public static class StoreAuthentication
         var auth = builder.Services.AddAuthentication(Scheme).AddCookie(Scheme, o =>
         {
             o.Cookie.Name = "shopsphere-session"; o.Cookie.HttpOnly = true;
-            o.Cookie.SameSite = SameSiteMode.Lax; o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+            o.Cookie.SameSite = SameSiteMode.Lax;
+            o.Cookie.SecurePolicy = builder.Environment.IsProduction() ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
             o.ExpireTimeSpan = TimeSpan.FromHours(8); o.SlidingExpiration = false;
             o.Events.OnRedirectToLogin = c => { c.Response.StatusCode = 401; return Task.CompletedTask; };
             o.Events.OnRedirectToAccessDenied = c => { c.Response.StatusCode = 403; return Task.CompletedTask; };
@@ -40,13 +39,29 @@ public static class StoreAuthentication
                 c.Response.Redirect(QueryHelpers.AddQueryString(c.RedirectUri, "prompt", "select_account"));
                 return Task.CompletedTask;
             };
-            o.Events.OnCreatingTicket = c =>
+            o.Events.OnCreatingTicket = async c =>
             {
                 var subject = c.Principal?.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new InvalidOperationException("Missing Google account ID.");
-                ((ClaimsIdentity)c.Principal!.Identity!).AddClaim(new Claim("customer_id", "google-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(subject))).ToLowerInvariant()));
-                if ((c.User.TryGetProperty("verified_email", out var verified) || c.User.TryGetProperty("email_verified", out verified)) && verified.ValueKind == JsonValueKind.True)
-                    ((ClaimsIdentity)c.Principal.Identity!).AddClaim(new Claim("email_verified", "true"));
-                return Task.CompletedTask;
+                var email = c.User.TryGetProperty("email", out var emailValue) ? emailValue.GetString() : c.Principal?.FindFirstValue(ClaimTypes.Email);
+                var name = c.User.TryGetProperty("name", out var nameValue) ? nameValue.GetString() : c.Principal?.FindFirstValue(ClaimTypes.Name);
+                var picture = c.User.TryGetProperty("picture", out var pictureValue) ? pictureValue.GetString() : null;
+                var verified = (c.User.TryGetProperty("verified_email", out var verifiedValue) || c.User.TryGetProperty("email_verified", out verifiedValue)) && verifiedValue.ValueKind == JsonValueKind.True;
+                var account = await c.HttpContext.RequestServices.GetRequiredService<Accounts>()
+                    .SignInWithGoogle(subject, email ?? "", name ?? "", picture, verified, c.HttpContext.RequestAborted);
+                var identity = (ClaimsIdentity)c.Principal!.Identity!;
+                foreach (var claim in identity.FindAll(ClaimTypes.NameIdentifier).Concat(identity.FindAll(ClaimTypes.Name)).Concat(identity.FindAll(ClaimTypes.Email))
+                             .Concat(identity.FindAll("customer_id")).Concat(identity.FindAll("provider")).Concat(identity.FindAll("local_admin")).Concat(identity.FindAll("email_verified")).ToArray())
+                    identity.RemoveClaim(claim);
+                identity.AddClaims([
+                    new Claim(ClaimTypes.NameIdentifier, account.Id.ToString()),
+                    new Claim(ClaimTypes.Name, account.Name),
+                    new Claim(ClaimTypes.Email, account.Email),
+                    new Claim("customer_id", "google-" + Accounts.GoogleSubjectDigest(subject)),
+                    new Claim("provider", "google"),
+                    new Claim("local_admin", account.IsAdmin ? "true" : "false"),
+                    new Claim("email_verified", "true")
+                ]);
+                return;
             };
             o.Events.OnRemoteFailure = c => { c.HandleResponse(); c.Response.Redirect("/login?error=google"); return Task.CompletedTask; };
         });

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ShopSphere.Gateway;
@@ -11,9 +12,11 @@ using ShopSphere.Gateway;
 namespace ShopSphere.Gateway.Persistence.Migrations
 {
     [DbContext(typeof(AccountsDb))]
-    partial class AccountsDbModelSnapshot : ModelSnapshot
+    [Migration("20261008172347_GoogleAccountIdentity")]
+    partial class GoogleAccountIdentity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

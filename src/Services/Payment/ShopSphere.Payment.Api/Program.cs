@@ -17,6 +17,13 @@ app.MapGet("/api/payments/{orderId:guid}", async (Guid orderId, IPayments paymen
 app.MapPost("/api/payments/checkout-session", (CheckoutSessionRequest request, IPayments payments, CancellationToken ct) => payments.Checkout(request.OrderId, ct));
 app.MapPost("/api/payments/{orderId:guid}/simulate", (Guid orderId, SimulateRequest request, IPayments payments, CancellationToken ct) =>
     payments.Simulate(orderId, request.Paid, ct));
+app.MapGet("/api/admin/payments", async (IPayments payments, CancellationToken ct) => Results.Ok(await payments.RecentOperations(ct)));
+app.MapPost("/api/admin/payments/{orderId:guid}/reconcile", async (Guid orderId, HttpRequest request, IPayments payments, CancellationToken ct) =>
+{
+    var actor = request.Headers["X-Admin-Email"].ToString();
+    if (string.IsNullOrWhiteSpace(actor)) return Results.Unauthorized();
+    return Results.Ok(await payments.Reconcile(orderId, actor, ct));
+});
 app.MapPost("/api/payments/webhooks/stripe", async (HttpRequest request, IPayments payments, CancellationToken ct) =>
 {
     using var reader = new StreamReader(request.Body);

@@ -11,7 +11,7 @@ builder.Services.AddDbContext<AccountsDb>(o => o.UseNpgsql(builder.Configuration
 builder.Services.AddScoped<Accounts>();
 builder.AddStoreRateLimiting();
 var services = new[] { ("Catalog", "products"), ("Catalog", "categories"), ("Basket", "basket"),
-    ("Ordering", "orders"), ("Inventory", "inventory"), ("Payment", "payments"),
+    ("Ordering", "orders"), ("Inventory", "inventory"), ("Payment", "payments"), ("Payment", "admin/payments"),
     ("Catalog", "admin/products"), ("Inventory", "admin/inventory"), ("Ordering", "admin/orders"), ("Catalog", "media") };
 var routes = services.Select((s, i) => new RouteConfig
 {

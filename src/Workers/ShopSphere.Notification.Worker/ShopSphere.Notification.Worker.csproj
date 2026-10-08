@@ -2,6 +2,9 @@
   <ItemGroup>
     <ProjectReference Include="../../BuildingBlocks/ShopSphere.Messaging/ShopSphere.Messaging.csproj" />
     <ProjectReference Include="../../../contracts/ShopSphere.Contracts/ShopSphere.Contracts.csproj" />
-
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="MailKit" />
   </ItemGroup>
 </Project>

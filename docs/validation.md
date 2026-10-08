@@ -1,5 +1,14 @@
 # Validation
 
+## Account, email, security and payment operations — 2026-10-09
+
+- .NET Release test suite passed: 44 tests, 0 failures, including Google account persistence and Payment/Notification migration model tests.
+- Frontend lint, typecheck and production build passed after adding the admin Payments page.
+- Docker Compose configuration parsed successfully. The local Docker engine was unavailable, so the updated migrations and service startup were not exercised in containers.
+- Google account persistence, SMTP delivery, production deployment configuration and Stripe test/live reconciliation were not exercised against running providers in this validation. No SMTP account, Stripe live key/webhook secret, or production target was provided.
+- The production guards validate required configuration at startup; this does not establish that certificates, external services, secret injection, or a deployed environment work.
+- `git diff --check` and a final Compose configuration validation are run as part of this update.
+
 ## Stock-aware catalog and checkout — 2026-10-08
 
 - Catalog now lists available products by default, supports category/search/sort/pagination, and exposes an explicit out-of-stock filter. Live stock batches drive storefront availability and quantity limits.

@@ -19,6 +19,7 @@ When changing the frontend port or hostname, update `FRONTEND_URL` and the Googl
 
 - Browsing products is public. A Google or local account session is required for basket, order and payment operations through Gateway.
 - Basket IDs are derived from Google's stable account ID, rather than email addresses or browser-generated IDs.
+- A verified Google `sub` is SHA-256 hashed and stored with the account in Gateway's Accounts database; the profile name, HTTPS picture URL and last sign-in time are refreshed on login. The raw provider subject and OAuth tokens are not stored. A verified email can link to an existing account; an unverified or conflicting identity is rejected.
 - Gateway checks basket ownership, checkout customer ID, and order ownership before allowing order/payment requests. Google tokens and secrets are not exposed to the browser.
 - State-changing storefront requests must carry the configured storefront Origin. The Stripe webhook retains its signature-based protection.
 - Data Protection keys persist in the `auth-keys` Docker volume so sessions survive Gateway container replacement.
@@ -46,7 +47,7 @@ Anonymous requests forwarded by the local Next.js server share that server's con
 
 Verified locally on 2026-10-07 with the configured Google OAuth client: real Google sign-in returns to the storefront, the header displays the account name, reload retains the session, basket writes succeed, checkout pre-fills account name/email, logout removes access, and signing back in restores the same basket and return URL. The walkthrough left one Keychron K2 in the signed-in account's bag; no order or payment was created.
 
-The current checked-in .NET suite covers checkout and administration rules. `scripts/admin-smoke-test.mjs` checks real local-account sessions, administrator authorization, and Origin checks against the Docker stack. A second real Google account has not been tested.
+The account-persistence implementation includes an EF migration and model tests. The current environment did not have a running Docker engine, so applying that migration and verifying a Google callback writes/updates an account row remain pending runtime checks. `scripts/admin-smoke-test.mjs` checks real local-account sessions, administrator authorization, and Origin checks against the Docker stack. A second real Google account has not been tested.
 
 Without a configured OAuth client, the login screen offers email/password login and registration. Gateway must own `/auth-keys` as the non-root application user; the Dockerfile prepares this directory with permissions 700. Existing root-owned volumes need their owner corrected before OAuth can protect state or session cookies.
 

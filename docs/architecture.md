@@ -16,10 +16,10 @@ Every stateful event consumer runs within the EF consumer outbox transaction. AP
 
 Inventory locks product rows in ascending ID order, checks every line before changing any stock, and persists one reservation per order. Stock constraints prevent negative quantities. Confirmation reduces reserved quantity without returning available stock; failure releases once.
 
-Stripe event receipts are permanent records keyed by Stripe event ID. Signature verification occurs before database writes. Supported Session events must match the stored Session ID, currency, integer amount, order reference and test mode. Completed events must have payment_status=paid. Stripe API creation uses a stable idempotency key based on the order ID. See [Stripe fulfillment guidance](https://docs.stripe.com/checkout/fulfillment).
+Stripe event receipts are permanent records keyed by Stripe event ID. Signature verification occurs before database writes. Supported Session events must match the stored Session ID, currency, integer amount, order reference and live/test mode. Completed events must have payment_status=paid. Stripe API creation uses a stable idempotency key based on the order ID. See [Stripe fulfillment guidance](https://docs.stripe.com/checkout/fulfillment).
 
 Basket confirmation uses one Redis Lua operation for a duplicate marker and purchased-quantity subtraction, preserving quantities added after checkout. Markers and baskets expire after seven days; this is a local demo retention policy, not a permanent audit ledger.
 
 PostgreSQL 18 stores data in a versioned directory under /var/lib/postgresql, so the named volume is mounted at that parent directory. See the [official image documentation](https://hub.docker.com/_/postgres). Seq is local and explicitly configured without authentication; its port binds only to loopback.
 
-No real email is sent. A delivery ledger and provider idempotency would be needed before replacing simulated log output with email.
+Notification uses a durable event-ID delivery ledger and can send customer messages through SMTP with mandatory TLS. Local mode defaults to Console simulation. SMTP is at-least-once: a crash after the provider accepts a message but before the ledger commits can cause a duplicate on retry. See [email delivery](email-delivery.md).

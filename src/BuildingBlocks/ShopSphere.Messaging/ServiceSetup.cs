@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Security.Authentication;
 using System.Text.Json.Serialization;
 using MassTransit;
 using Microsoft.AspNetCore.Builder;
@@ -7,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Serilog;
 using ShopSphere.SharedKernel;
 
@@ -16,12 +18,16 @@ public static class ServiceSetup
 {
     public static void AddDefaults(this WebApplicationBuilder builder, string serviceName)
     {
-        builder.Services.AddSerilog((services, log) => log
-            .MinimumLevel.Information()
-            .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
-            .Enrich.FromLogContext().Enrich.WithProperty("Service", serviceName)
-            .WriteTo.Console()
-            .WriteTo.Seq(builder.Configuration["Seq:Url"] ?? "http://localhost:5341"));
+        ProductionConfiguration.Validate(builder, serviceName);
+        builder.Services.AddSerilog((services, log) =>
+        {
+            log.MinimumLevel.Information()
+                .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
+                .Enrich.FromLogContext().Enrich.WithProperty("Service", serviceName)
+                .WriteTo.Console();
+            if (!builder.Environment.IsProduction())
+                log.WriteTo.Seq(builder.Configuration["Seq:Url"] ?? "http://localhost:5341");
+        });
         builder.Services.ConfigureHttpJsonOptions(o =>
             o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
         builder.Services.AddProblemDetails();
@@ -63,13 +69,21 @@ public static class ServiceSetup
             });
             x.UsingRabbitMq((context, cfg) =>
             {
-                cfg.Host(config["RabbitMq:Host"] ?? "localhost", "/", h =>
-                {
-                    h.Username(config["RabbitMq:Username"] ?? "shopsphere");
-                    h.Password(config["RabbitMq:Password"] ?? "shopsphere-local");
-                });
+                cfg.ConfigureRabbitMqHost(config);
                 cfg.ConfigureEndpoints(context, new KebabCaseEndpointNameFormatter(service, false));
             });
+        });
+    }
+
+    public static void ConfigureRabbitMqHost(this IRabbitMqBusFactoryConfigurator bus, IConfiguration config)
+    {
+        var port = config.GetValue<ushort?>("RabbitMq:Port") ?? 5672;
+        bus.Host(config["RabbitMq:Host"] ?? "localhost", port, "/", host =>
+        {
+            host.Username(config["RabbitMq:Username"] ?? "shopsphere");
+            host.Password(config["RabbitMq:Password"] ?? "shopsphere-local");
+            if (config.GetValue<bool>("RabbitMq:UseSsl"))
+                host.UseSsl(ssl => ssl.Protocol = SslProtocols.Tls12);
         });
     }
 

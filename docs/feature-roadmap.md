@@ -1,14 +1,25 @@
 # ShopSphere feature completion plan
 
-**Last reviewed:** 2026-10-08
+**Last reviewed:** 2026-10-09
 
 **Scope update:** The subsequent administration request adds local email/password registration/login, a seeded administrator, product/stock/order management, and MinIO photo storage. See [the admin runbook](admin.md) and use `node --env-file=.env scripts/admin-smoke-test.mjs` for authenticated verification. Google/Gmail remains an optional login provider with Gateway ownership checks. The older anonymous baseline and day plan below are retained as the original checkout plan, not the current implementation scope.
 **Source of truth:** `README.md` and `docs/project-brief.md`
-**Target:** complete and demonstrate the README's checkout and the requested administration/account features. Fulfillment, shipping, tax, reviews, promotions and email delivery remain outside this target.
+**Target:** complete and demonstrate the README checkout, administration/account features, customer email delivery and payment operations. Fulfillment, shipping, tax, reviews and promotions remain outside this target.
 
 ## Current status
 
-The codebase and Docker stack implement both **Demo** and **Stripe test mode** checkout. On 2026-10-08, real Stripe Session creation, CLI-delivered signed completion/expiry events, storefront confirmation, stock/basket effects and repeat-event handling passed. See [Stripe setup](stripe.md) and [validation evidence](validation.md). The local stack is currently configured for Stripe; repository defaults remain Demo.
+The codebase supports **Demo** and Stripe test/live modes. On 2026-10-08, real Stripe test Session creation, CLI-delivered signed completion/expiry events, storefront confirmation, stock/basket effects and repeat-event handling passed. The current code also persists verified Google identities, sends customer email through configurable SMTP, validates production security settings and exposes admin payment reconciliation. These latest changes pass source/build checks, but Docker-backed runtime checks, SMTP provider delivery, production deployment and Stripe live operations remain unverified because the required local services/credentials/target are unavailable. See [validation evidence](validation.md).
+
+## Requested feature status — 2026-10-09
+
+| Feature | Status | Evidence / remaining check |
+| --- | --- | --- |
+| Google sign-in account persistence | Implemented | Verified-email Google `sub` is persisted as a one-way hash with profile and last-login fields; EF migration and model tests added. Applying the migration and exercising the OAuth callback against the running stack remain to be verified. |
+| Customer email delivery | Implemented | MailKit SMTP with TLS, retry, and an event-ID delivery ledger; Console simulation remains the local default. Configure a real SMTP provider and verify inbox delivery. SMTP remains at-least-once if the process crashes after provider acceptance and before the ledger commit. |
+| Deployment security hardening | Implemented | Production startup requires secret/TLS settings for service dependencies, HTTPS storefront, persistent Gateway key storage, and live Stripe configuration. No production target/deployment has been exercised; Gateway rate limits are process-local and require a shared limiter for multi-replica deployment. |
+| Live payment operations | Implemented | Test/live Stripe environment matching, admin payment-operation view and server-side session reconciliation are implemented. No live key/webhook endpoint was supplied or tested; reconciliation does not issue refunds. |
+
+“Implemented” describes repository code and automated checks. It does not claim external account setup, successful provider delivery, a production deployment, or a real charge.
 
 - [x] Catalog: six seeded products, categories and product details.
 - [x] Basket: Redis storage, quantity changes and product information fetched from Catalog.
@@ -17,7 +28,7 @@ The codebase and Docker stack implement both **Demo** and **Stripe test mode** c
 - [x] Messaging: RabbitMQ/MassTransit, transactional outbox/inbox and retry.
 - [x] Payment service: hosted Checkout Session integration code, signed webhook validation, persistent event receipts and Demo simulation.
 - [x] Customer flow: catalog, product detail, bag, checkout and order-status pages.
-- [x] Notification worker: confirmation/cancellation events appear in logs as simulated emails.
+- [x] Notification worker: confirmation/cancellation events use configurable SMTP delivery with local Console simulation.
 - [x] Initial EF migrations, Docker Compose, CI workflow, smoke checks and synthetic signed-webhook checks.
 - [x] External Stripe Test Mode checkout verified with test credentials and a running Stripe CLI listener.
 - [x] Local registration/login, seeded admin, administration and MinIO product images implemented; see [admin runbook](admin.md).
@@ -95,10 +106,10 @@ The remaining items below concern shared/public deployment. Authentication and l
 ### P1 — Before a shared or public deployment
 
 - [x] Add authentication and authorize basket, payment and order lookups against the signed-in customer at Gateway.
-- [ ] Replace local demo credentials, open Seq configuration and unauthenticated Redis/RabbitMQ connections with deployment secrets and appropriate access controls.
-- [ ] Add production TLS, environment-specific Stripe webhook secrets, request rate limits and secret/PII redaction.
-- [ ] Monitor Stripe webhook delivery and RabbitMQ error queues; define operator steps to replay or reconcile a payment safely.
-- [ ] Replace simulated email logging with a provider, retry policy and delivery idempotency only when email delivery becomes part of the product.
+- [x] Add production startup guards for secret-backed credentials, TLS and service-specific secure configuration; actual deployment validation remains pending.
+- [x] Add TLS/configuration support for SMTP, RabbitMQ, Redis, database, S3 and live Stripe; verify real deployment endpoints before release.
+- [x] Add administrator payment reconciliation against Stripe; monitoring, incident rehearsal and refund operations remain separate release work.
+- [x] Add customer email provider support, retry policy and durable event-ID delivery ledger; configure and verify a real SMTP account before release.
 
 ### P2 — Original README stretch goals
 

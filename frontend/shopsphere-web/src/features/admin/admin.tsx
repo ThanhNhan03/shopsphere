@@ -16,9 +16,12 @@ type Stock = { productId: string; availableQuantity: number; reservedQuantity: n
 type Adjustment = { id: string; delta: number; availableAfter: number; reason: string; performedBy: string; createdAt: string };
 type Summary = { totalOrders: number; pendingOrders: number; confirmedOrders: number; cancelledOrders: number; revenue: number };
 type OrderPage = { items: Order[]; total: number; page: number; pageSize: number };
+type PaymentOperation = { orderId: string; status: string; amount: number; currency: string; environment: string; canReconcile: boolean; createdAt: string; completedAt: string | null; lastReconciledAt: string | null; lastOutcome: string | null; lastErrorType: string | null };
+type Reconciliation = { orderId: string; providerStatus: string; providerPaymentStatus: string; outcome: string; reconciledAt: string };
 const navigation: { key: string; label: string; icon: IconName }[] = [
   { key: "overview", label: "Overview", icon: "spark" }, { key: "products", label: "Products", icon: "box" },
   { key: "inventory", label: "Inventory", icon: "bag" }, { key: "orders", label: "Orders", icon: "check" },
+  { key: "payments", label: "Payments", icon: "card" },
 ];
 const date = (value: string) => new Date(value).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
 function Badge({ value }: { value: string }) { return <span className={`admin-badge ${value.toLowerCase()}`}>{value.replace(/([a-z])([A-Z])/g, "$1 $2")}</span>; }
@@ -126,6 +129,7 @@ function AdminWorkspace({ section, email }: { section: string; email: string }) 
         )}
       </>}
       {section === "orders" && <Orders />}
+      {section === "payments" && <PaymentOperations />}
     </div>
     {editProduct && <ProductEditor product={editProduct === "new" ? null : editProduct} close={() => setEditProduct(null)} />}
     {editStock && <StockEditor product={editStock} stock={stockFor(editStock.id)} close={() => setEditStock(null)} />}
@@ -177,4 +181,34 @@ function Orders() {
 function OrderDetail({ id, close }: { id: string; close: () => void }) {
   const order = useQuery({ queryKey: ["admin", "order", id], queryFn: () => api<Order>(`/api/admin/orders/${id}`), refetchInterval: 5000 }); const o = order.data;
   return <Dialog title="Order details" close={close}>{order.isPending ? <Loading /> : <><ErrorMessage error={order.error} />{o && <div className="admin-order-detail"><div className="admin-order-id">#{o.id}<Badge value={o.status} /></div><dl><dt>Customer</dt><dd>{o.customerName}</dd><dt>Email</dt><dd>{o.email}</dd><dt>Placed</dt><dd>{date(o.createdAt)}</dd></dl>{o.cancellationReason && <p role="status" className="admin-note">Cancellation: {o.cancellationReason}</p>}<table><thead><tr><th>Product</th><th>Qty</th><th>Total</th></tr></thead><tbody>{o.items.map(i => <tr key={i.productId}><td>{i.name}<small>{money(i.unitPrice)} each</small></td><td>{i.quantity}</td><td>{money(i.unitPrice * i.quantity)}</td></tr>)}</tbody></table><div className="admin-summary-row"><strong>Order total</strong><b>{money(o.totalAmount)}</b></div><p className="admin-note">Inventory and payment events determine this status. Confirmed revenue does not include cancelled or unpaid orders.</p></div>}</>}</Dialog>;
+}
+
+function PaymentOperations() {
+  const client = useQueryClient();
+  const payments = useQuery({ queryKey: ["admin", "payments"], queryFn: () => api<PaymentOperation[]>("/api/admin/payments"), refetchInterval: 15000 });
+  const reconcile = useMutation({
+    mutationFn: (orderId: string) => api<Reconciliation>(`/api/admin/payments/${orderId}/reconcile`, { method: "POST" }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["admin", "payments"] }),
+  });
+  return <>
+    <p className="admin-intro">Review the latest payment sessions and compare their saved state with Stripe. Reconciliation uses Stripe’s server-side session record; it does not issue refunds.</p>
+    <ErrorMessage error={payments.error || reconcile.error} />
+    {payments.isPending ? <Loading /> : <div className="admin-panel admin-table-wrap">
+      <table aria-label="Payment operations">
+        <thead><tr><th>Order</th><th>Environment</th><th>Status</th><th>Amount</th><th>Last reconciliation</th><th><span className="sr-only">Actions</span></th></tr></thead>
+        <tbody>{payments.data?.map(payment => <tr key={payment.orderId}>
+          <td><strong title={payment.orderId}>#{payment.orderId.slice(0, 8)}</strong><small>{date(payment.createdAt)}</small></td>
+          <td><Badge value={payment.environment} /></td>
+          <td><Badge value={payment.status} /></td>
+          <td>{money(payment.amount)}</td>
+          <td>{payment.lastReconciledAt ? <><span>{date(payment.lastReconciledAt)}</span><small>{payment.lastOutcome?.replaceAll(/([a-z])([A-Z])/g, "$1 $2")}{payment.lastErrorType ? ` · ${payment.lastErrorType}` : ""}</small></> : <span className="admin-note">Not checked</span>}</td>
+          <td><button className="admin-secondary" disabled={!payment.canReconcile || reconcile.isPending} onClick={() => {
+            if (window.confirm(`Check order #${payment.orderId.slice(0, 8)} against Stripe? A verified paid or expired session may update the order and inventory.`)) reconcile.mutate(payment.orderId);
+          }}>{reconcile.isPending ? "Checking…" : payment.canReconcile ? "Check Stripe" : "No Stripe session"}</button></td>
+        </tr>)}</tbody>
+      </table>
+      {!payments.data?.length && <p className="admin-empty">No payment sessions have been created yet.</p>}
+      <div className="admin-table-footer">Showing up to 100 recent payment sessions. Card details and secrets are never shown here.</div>
+    </div>}
+  </>;
 }

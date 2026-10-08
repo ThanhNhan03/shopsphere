@@ -1,4 +1,4 @@
-# Stripe test-mode payments
+# Stripe payments and operations
 
 Last verified locally: **2026-10-08**. Hosted Stripe Checkout, a real signed completion webhook, order confirmation, stock commit, basket cleanup, expiry compensation and repeated-event handling passed. See [validation notes](validation.md).
 
@@ -59,4 +59,12 @@ The separate `stripe-webhook-test.mjs` fixture harness checks wrong amounts and 
 
 ## Boundaries
 
-This implementation deliberately accepts only `sk_test_` keys and test-mode matching Checkout events. It supports card payments, not refunds, shipping, tax or live payments. Local use needs the CLI listener; a shared deployment needs a reachable HTTPS webhook endpoint and its own signing secret, plus delivery monitoring and payment reconciliation. Broker-outage recovery and the GitHub Actions run for these changes have not been verified in this local Stripe check.
+The payment service accepts `sk_test_` and `sk_live_` secret keys. Stored Checkout sessions, the secret-key mode and each signed Stripe Event's `livemode` must agree before a payment can settle; Stripe exposes this environment flag on its [Event object](https://docs.stripe.com/api/events/object?lang=node&lang%29=). Session creation remains idempotent by order. Production startup refuses to run Stripe payments without `PAYMENT_MODE=Stripe`, an `sk_live_` key, and the matching webhook secret. Keep live secrets in a deployment secret store, never in source control or client code.
+
+## Administrator payment operations
+
+Open `/admin/payments` (or choose **Payments** in the admin navigation) to inspect the latest 100 payment records. In Stripe mode, a pending/processing Stripe Checkout Session can be reconciled against Stripe's server-side session record. The service validates session ID, order reference, currency, amount and live/test mode before applying an existing payment transition through the transactional outbox. Stripe's retrieval endpoint is documented [here](https://docs.stripe.com/api/checkout/sessions/retrieve).
+
+Reconciliation records an operator audit outcome and is safe to repeat. A mismatch is left for manual review; this operation does not refund, capture, or modify a Stripe Session. Confirm the deployed webhook endpoint and monitor Stripe's delivery dashboard as well as this reconciliation page. No live credential or live deployment has been verified in this checkout, so this runbook describes supported code paths rather than a completed live-money rehearsal.
+
+A shared deployment needs a publicly reachable HTTPS webhook endpoint, its own live signing secret, alerting and an operator process. Local use needs the CLI listener described above. Broker-outage recovery and the GitHub Actions run for these changes have not been verified in this local Stripe check.

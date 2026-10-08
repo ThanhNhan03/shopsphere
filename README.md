@@ -46,11 +46,11 @@ docker compose down
 
 **Stripe** connects to real Stripe infrastructure in test mode:
 
-1. Set `PAYMENT_MODE=Stripe` and `STRIPE_SECRET_KEY=sk_test_...` in the ignored `.env`.
-2. Run `stripe listen --forward-to http://localhost:8080/api/payments/webhooks/stripe` using the [Stripe CLI](https://docs.stripe.com/stripe-cli).
-3. Set `STRIPE_WEBHOOK_SECRET` to the `whsec_...` value printed by the listener.
-4. Run `docker compose up -d payment-api` to recreate Payment with the new settings.
-5. Create a fresh order, continue to Stripe, and use [Stripe test payment details](https://docs.stripe.com/testing).
+1. Set `STRIPE_SECRET_KEY=sk_test_...` to your actual test key in the ignored `.env`.
+2. Install the official [Stripe CLI](https://docs.stripe.com/cli/install), then run `./scripts/start-stripe-local.ps1` from the repository root on Windows. It captures the listener's signing secret, enables Stripe mode and recreates Payment using the configured local ports.
+3. Create an order, continue to Stripe, and use [Stripe test payment details](https://docs.stripe.com/testing).
+
+The listener runs in the background and must remain active. Run the script again after restarting Windows or changing the key; use `-Stop` to stop its listener. See the [Stripe runbook](docs/stripe.md) for verification, local files and switching back to Demo. Real test-mode Session creation, signed completion/expiry webhooks and the confirmed-order journey were verified locally on 2026-10-08.
 
 Only signed, matching test-mode Checkout Session webhooks can settle Stripe payments. The browser redirect merely opens the order page, which polls the backend. Secret keys stay in Payment; no publishable key is needed for a hosted Checkout redirect. Demo simulation is disabled in Stripe mode.
 
@@ -102,7 +102,7 @@ Domain does not reference Infrastructure. Application defines service operations
 
 The original design and team/day plan are preserved in [project brief](docs/project-brief.md). The runtime uses two practical simplifications: no separate EventBus wrapper over MassTransit, and the Notification worker is a small hosted process with a health endpoint.
 
-See the [feature completion plan](docs/feature-roadmap.md) for the remaining Stripe verification and release checklist.
+See the [feature completion plan](docs/feature-roadmap.md) for verified features and the remaining release checklist.
 
 ## Develop and verify
 
@@ -135,13 +135,13 @@ With the stack running in Demo mode:
 node --env-file=.env scripts/admin-smoke-test.mjs
 ```
 
-The authenticated smoke check exercises registration/login/logout, administrator authorization, MinIO image replacement, visibility, concurrent edit protection, stock adjustment history, concurrent checkout retries and order confirmation. It uses an isolated customer/product/order, then hides the test product and clears its available stock. The test account and order remain in history. The original anonymous `smoke-test.mjs` and webhook harness need authentication updates; do not disable Gateway authorization to run them.
+The authenticated smoke check exercises registration/login/logout, administrator authorization, MinIO image replacement, visibility, concurrent edit protection, stock adjustment history, concurrent checkout retries and order confirmation. It uses an isolated customer/product/order, then hides the test product and clears its available stock. The test account and order remain in history. The original anonymous `smoke-test.mjs` still needs authentication updates; do not disable Gateway authorization to run it. The webhook harness now registers its own customers. For real Stripe Sessions and CLI-delivered events, use `scripts/stripe-checkout-test.mjs` as described in the [Stripe runbook](docs/stripe.md).
 
 Signed webhook fixtures can be checked without a Stripe account:
 
 ```powershell
 docker compose run -d --no-deps --name shopsphere-webhook-test -p 127.0.0.1:5105:8080 -e Payment__Mode=Stripe -e Stripe__WebhookSecret=whsec_fixture_only payment-api
-node scripts/stripe-webhook-test.mjs
+node --env-file=.env scripts/stripe-webhook-test.mjs
 docker rm -f shopsphere-webhook-test
 ```
 

@@ -73,4 +73,16 @@ public sealed class CheckoutRulesTests
     [Theory] [InlineData(0)] [InlineData(-1)] [InlineData(1.999)]
     public void InvalidPaymentAmountsAreRejected(decimal amount) =>
         Assert.Throws<ApiException>(() => PaymentEntity.MinorUnits(amount));
+    [Theory]
+    [InlineData("Demo", "demo_order", "https://store.example/orders/order", true)]
+    [InlineData("Stripe", "demo_order", "https://store.example/orders/order", false)]
+    [InlineData("Stripe", "cs_test_order", "https://checkout.stripe.com/session", true)]
+    [InlineData("Demo", "cs_test_order", "https://checkout.stripe.com/session", false)]
+    [InlineData("Stripe", null, null, false)]
+    [InlineData("Stripe", "cs_test_order", null, false)]
+    public void CheckoutUrlIsReusedOnlyForItsPaymentMode(string mode, string? sessionId, string? url, bool expected)
+    {
+        var payment = new PaymentEntity { StripeSessionId = sessionId, CheckoutUrl = url };
+        Assert.Equal(expected, payment.CanReuseCheckout(mode));
+    }
 }

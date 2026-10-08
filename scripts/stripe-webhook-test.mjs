@@ -2,7 +2,9 @@
 import assert from "node:assert/strict";
 import { randomUUID, createHmac } from "node:crypto";
 import { execFileSync } from "node:child_process";
-const gateway = process.env.API_URL || "http://localhost:8080";
+const gateway = process.env.API_URL || `http://localhost:${process.env.GATEWAY_PORT || 8080}`;
+const origin = process.env.FRONTEND_URL || `http://localhost:${process.env.FRONTEND_PORT || 3000}`;
+let cookie = "";
 const paymentBase = process.env.PAYMENT_FIXTURE_URL || "http://localhost:5105";
 const secret = "whsec_fixture_only";
 function sql(statement) {
@@ -10,7 +12,8 @@ function sql(statement) {
     'exec psql -U "$POSTGRES_USER" -d payment_db -v ON_ERROR_STOP=1 -tAc "$1"', "sh", statement], { encoding: "utf8" }).trim();
 }
 async function api(path, method = "GET", body) {
-  const r = await fetch(gateway + path, { method, headers: { "Content-Type": "application/json" }, body: body && JSON.stringify(body) });
+  const r = await fetch(gateway + path, { method, headers: { "Content-Type": "application/json", Origin: origin, Cookie: cookie }, body: body && JSON.stringify(body) });
+  for (const value of r.headers.getSetCookie()) if (value.startsWith("shopsphere-session=")) cookie = value.split(";")[0];
   assert.ok(r.ok, `${path} returned ${r.status}`);
   return r.status === 204 ? null : r.json();
 }
@@ -33,11 +36,12 @@ const products = await api("/api/products");
 const product = products.find(p => p.name === "MX Master 3S");
 const initial = await api(`/api/inventory/${product.id}`);
 async function makeOrder() {
-  const customerId = randomUUID();
+  await api("/api/auth/register", "POST", { name: "Webhook Buyer", email: `fixture-${randomUUID()}@example.com`, password: randomUUID() });
+  const customerId = (await api("/api/auth/session")).user.customerId;
   await api(`/api/basket/${customerId}/items`, "POST", { productId: product.id, quantity: 1 });
   const order = await api("/api/orders", "POST", { checkoutId: randomUUID(), customerId, customerName: "Webhook Buyer", email: "fixture@example.com" });
   await until(() => api(`/api/orders/${order.id}`), o => o.status === "AwaitingPayment", "reserve fixture order");
-  await until(async () => (await fetch(gateway + `/api/payments/${order.id}`)).status, status => status === 200, "create pending payment");
+  await until(async () => (await fetch(gateway + `/api/payments/${order.id}`, { headers: { Cookie: cookie } })).status, status => status === 200, "create pending payment");
   const sessionId = "cs_test_" + order.id.replaceAll("-", "");
   sql(`UPDATE "Payments" SET "StripeSessionId" = '${sessionId}', "Status" = 1 WHERE "OrderId" = '${order.id}'`);
   return { ...order, sessionId };
@@ -64,4 +68,4 @@ await until(() => api(`/api/inventory/${product.id}`), s => s.availableQuantity 
 assert.equal(sql(`SELECT count(*) FROM "StripeReceipts" WHERE "EventId" = '${expired.id}'`), "1");
 await api(`/api/basket/${failed.customerId}`, "DELETE");
 console.log("PASS: bad signature, mismatched amount, signed success, duplicate Stripe receipt, signed expiry, duplicate failure, compensation");
-console.log("Synthetic fixtures only; external Stripe Checkout is unverified. One mouse was consumed.");
+console.log("Synthetic fixtures only; this harness does not verify external Stripe Checkout. One mouse was consumed.");

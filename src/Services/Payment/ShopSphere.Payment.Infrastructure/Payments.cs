@@ -24,7 +24,9 @@ public sealed class Payments(PaymentDb db, IPublishEndpoint publish, IConfigurat
         var payment = await Lock(orderId, ct);
         if (payment.Status is PaymentStatus.Completed or PaymentStatus.Failed or PaymentStatus.Cancelled)
             throw new ApiException(409, "Payment has already finished.");
-        if (payment.CheckoutUrl != null) return View(payment);
+        if (Mode == "Demo" && payment.StripeSessionId is not null && !payment.StripeSessionId.StartsWith("demo_", StringComparison.Ordinal))
+            throw new ApiException(409, "This order has a Stripe session. Resume it with Stripe payment mode enabled.");
+        if (payment.CanReuseCheckout(Mode)) return View(payment);
         if (Mode == "Demo")
         {
             payment.CheckoutUrl = $"{config["Frontend:Url"] ?? "http://localhost:3000"}/orders/{orderId}";
@@ -35,23 +37,32 @@ public sealed class Payments(PaymentDb db, IPublishEndpoint publish, IConfigurat
             var key = config["Stripe:SecretKey"];
             if (string.IsNullOrWhiteSpace(key) || !key.StartsWith("sk_test_", StringComparison.Ordinal))
                 throw new ApiException(503, "Configure a Stripe test secret key before starting payment.");
-            var session = await new SessionService(new StripeClient(key)).CreateAsync(new SessionCreateOptions
+            Session session;
+            try
             {
-                Mode = "payment", CustomerEmail = payment.Email, ClientReferenceId = orderId.ToString(),
-                AllowedPaymentMethodTypes = ["card"],
-                SuccessUrl = $"{config["Frontend:Url"] ?? "http://localhost:3000"}/payment/success?order_id={orderId}&session_id={{CHECKOUT_SESSION_ID}}",
-                CancelUrl = $"{config["Frontend:Url"] ?? "http://localhost:3000"}/orders/{orderId}?cancelled=1",
-                ExpiresAt = DateTime.UtcNow.AddMinutes(31),
-                Metadata = new() { ["orderId"] = orderId.ToString() },
-                LineItems = [new SessionLineItemOptions
+                session = await new SessionService(new StripeClient(key)).CreateAsync(new SessionCreateOptions
                 {
-                    Quantity = 1, PriceData = new SessionLineItemPriceDataOptions
+                    Mode = "payment", CustomerEmail = payment.Email, ClientReferenceId = orderId.ToString(),
+                    AllowedPaymentMethodTypes = ["card"],
+                    SuccessUrl = $"{config["Frontend:Url"] ?? "http://localhost:3000"}/payment/success?order_id={orderId}&session_id={{CHECKOUT_SESSION_ID}}",
+                    CancelUrl = $"{config["Frontend:Url"] ?? "http://localhost:3000"}/orders/{orderId}?cancelled=1",
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(31),
+                    Metadata = new() { ["orderId"] = orderId.ToString() },
+                    LineItems = [new SessionLineItemOptions
                     {
-                        Currency = payment.Currency, UnitAmount = PaymentEntity.MinorUnits(payment.Amount),
-                        ProductData = new SessionLineItemPriceDataProductDataOptions { Name = $"ShopSphere order {orderId}" }
-                    }
-                }]
-            }, new RequestOptions { IdempotencyKey = $"checkout-{orderId}" }, ct);
+                        Quantity = 1, PriceData = new SessionLineItemPriceDataOptions
+                        {
+                            Currency = payment.Currency, UnitAmount = PaymentEntity.MinorUnits(payment.Amount),
+                            ProductData = new SessionLineItemPriceDataProductDataOptions { Name = $"ShopSphere order {orderId}" }
+                        }
+                    }]
+                }, new RequestOptions { IdempotencyKey = $"checkout-{orderId}" }, ct);
+            }
+            catch (StripeException)
+            {
+                // Provider error messages can contain credential fragments; keep them out of responses and logs.
+                throw new ApiException(503, "Stripe Checkout could not be opened. Check the test configuration and try again.");
+            }
             payment.StripeSessionId = session.Id;
             payment.CheckoutUrl = session.Url;
         }
@@ -95,6 +106,8 @@ public sealed class Payments(PaymentDb db, IPublishEndpoint publish, IConfigurat
         if (Mode != "Demo") throw new ApiException(404, "Simulation is available only in Demo mode.");
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var payment = await Lock(orderId, ct);
+        if (payment.StripeSessionId is not null && !payment.StripeSessionId.StartsWith("demo_", StringComparison.Ordinal))
+            throw new ApiException(409, "A Stripe payment cannot be settled with Demo controls.");
         await Settle(payment, paid, "Demo payment declined.", ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);

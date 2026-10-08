@@ -95,3 +95,57 @@ main:has(.admin-root) { max-width: none; padding: 0; margin: 0; }
 .account-switch a { color: var(--accent); text-decoration: underline; }
 @media (max-width: 1100px) { .admin-sidebar { width: 210px; padding: 25px 16px; } .admin-content { padding: 30px 24px; } .admin-stats { grid-template-columns: 1fr 1fr; } .admin-overview-grid { grid-template-columns: 1fr; } }
 @media (max-width: 720px) { .admin-root { flex-direction: column; } .admin-sidebar { position: static; width: 100%; height: auto; padding: 20px; gap: 18px; } .admin-store-label { display: none; } .admin-sidebar nav { display: flex; overflow-x: auto; gap: 6px; } .admin-sidebar nav a { padding: 10px; font-size: 12px; gap: 7px; } .admin-sidebar nav a svg { width: 16px; } .admin-sidebar-bottom { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 14px; } .admin-sidebar-bottom > span { display: none; } .admin-content { padding: 25px 16px 45px; } .admin-top h1 { font-size: 29px; } .admin-role { padding: 8px; font-size: 10px; } .admin-stat { padding: 17px; gap: 12px; } .admin-stat strong { font-size: 25px; } .admin-stats { gap: 12px; } .admin-panel { padding: 18px; } .admin-table-wrap { padding: 0; } .admin-form-grid { grid-template-columns: 1fr; } .admin-dialog { padding: 22px; } .admin-toolbar .button { width: 100%; } .admin-search { min-width: 100%; } .admin-table-footer { flex-wrap: wrap; } }
+
+/* Keep inventory statuses compact and table content aligned as the dataset grows. */
+.admin-content { width: min(100%, 1600px); }
+.admin-sidebar nav a, .admin-sidebar-bottom button { min-height: 44px; }
+.admin-toolbar select { min-height: 44px; }
+.admin-secondary { min-height: 44px; cursor: pointer; transition: background-color var(--motion), border-color var(--motion), color var(--motion); }
+.admin-root .admin-table-wrap { border: 1px solid #dfe4dc; border-radius: 14px; }
+.admin-root .admin-table-wrap table { min-width: 680px; }
+.admin-root .admin-table-wrap th { vertical-align: middle; }
+.admin-root .admin-table-wrap td { vertical-align: middle; padding: 12px 18px; }
+.admin-root .admin-table-wrap tbody tr:hover td { background: #fbfcf8; transition: background-color var(--motion); }
+.admin-root .admin-number-cell { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.admin-root .inventory-table th:nth-child(2),
+.admin-root .inventory-table th:nth-child(3),
+.admin-root .inventory-table th:nth-child(4) { text-align: right; }
+.admin-root .inventory-table td:nth-child(4) { text-align: right; }
+.admin-root .admin-product-cell { gap: 12px; }
+.admin-root .admin-product-cell > div { min-width: 0; }
+.admin-root .admin-product-cell strong { overflow-wrap: anywhere; }
+.admin-root .admin-badge.empty { display: inline-flex; align-items: center; min-width: 0; min-height: 0; padding: 6px 10px; }
+.admin-root .admin-mobile-label { display: none; }
+
+@media (max-width: 950px) {
+  .admin-root { flex-direction: column; }
+  .admin-sidebar { position: static; width: 100%; height: auto; padding: 20px 24px; gap: 16px; }
+  .admin-store-label { display: none; }
+  .admin-sidebar nav { display: flex; flex-wrap: wrap; gap: 8px; }
+  .admin-sidebar-bottom { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .admin-content { padding: 30px 24px 48px; }
+}
+
+@media (max-width: 720px) {
+  .admin-root .admin-table-wrap.inventory-table,
+  .admin-root .admin-table-wrap.product-table { overflow: hidden; }
+  .admin-root .admin-table-wrap.inventory-table table,
+  .admin-root .admin-table-wrap.product-table table { display: block; min-width: 0; }
+  .admin-root .inventory-table thead,
+  .admin-root .product-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .admin-root .inventory-table tbody,
+  .admin-root .product-table tbody { display: grid; gap: 12px; padding: 12px; }
+  .admin-root .inventory-table tr,
+  .admin-root .product-table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; padding: 16px; border: 1px solid #e5e8df; border-radius: 12px; background: #fff; }
+  .admin-root .inventory-table td,
+  .admin-root .product-table td { display: grid; min-width: 0; align-content: start; gap: 5px; padding: 0; border: 0; text-align: left; }
+  .admin-root .inventory-table td:first-child,
+  .admin-root .inventory-table td:last-child,
+  .admin-root .product-table td:first-child,
+  .admin-root .product-table td:last-child { grid-column: 1 / -1; }
+  .admin-root .inventory-table td:nth-child(4) { text-align: left; }
+  .admin-root .inventory-table .admin-mobile-label,
+  .admin-root .product-table .admin-mobile-label { display: block; color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+  .admin-root .admin-product-cell { min-width: 0; }
+  .admin-root .admin-table-footer { padding: 14px 16px; }
+}

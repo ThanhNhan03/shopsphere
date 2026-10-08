@@ -54,8 +54,8 @@ export function Cart() {
         <div className="checkout-grid">
           <div className="bag-items">
             <div className="bag-table-head">
-              <span>PRODUCT</span>
-              <span>QUANTITY / TOTAL</span>
+              <span>YOUR ITEMS</span>
+              <span>QUANTITY · TOTAL</span>
             </div>
             {basket.data.items.map((item) => (
               <div className="cart-row" key={item.productId}>
@@ -85,25 +85,26 @@ export function Cart() {
                   </button>
                 </div>
                 <div className="cart-quantity">
-                  <label className="sr-only" htmlFor={item.productId}>
-                    Quantity for {item.name}
-                  </label>
-                  <select
-                    id={item.productId}
-                    value={item.quantity}
-                    disabled={change.isPending || !item.isAvailable}
-                    onChange={(e) =>
-                      change.mutate({
-                        productId: item.productId,
-                        quantity: Number(e.target.value),
-                        method: "PUT",
-                      })
-                    }
-                  >
-                    {Array.from({ length: 99 }, (_, i) => (
-                      <option key={i + 1}>{i + 1}</option>
-                    ))}
-                  </select>
+                  <div className="quantity-control cart-stepper" role="group" aria-label={`Quantity for ${item.name}`}>
+                    <button
+                      type="button"
+                      aria-label={`Decrease ${item.name} quantity`}
+                      disabled={change.isPending || !item.isAvailable || item.quantity <= 1}
+                      onClick={() => change.mutate({ productId: item.productId, quantity: item.quantity - 1, method: "PUT" })}
+                    >
+                      <Icon name="minus" size={16} />
+                    </button>
+                    <span className="cart-stepper-value" aria-hidden="true">{item.quantity}</span>
+                    <span className="sr-only" role="status" aria-atomic="true">{item.quantity} {item.name} {item.quantity === 1 ? "item" : "items"} in bag</span>
+                    <button
+                      type="button"
+                      aria-label={`Increase ${item.name} quantity`}
+                      disabled={change.isPending || !item.isAvailable || item.quantity >= 99}
+                      onClick={() => change.mutate({ productId: item.productId, quantity: item.quantity + 1, method: "PUT" })}
+                    >
+                      <Icon name="plus" size={16} />
+                    </button>
+                  </div>
                   <strong>{money(item.unitPrice * item.quantity)}</strong>
                 </div>
               </div>
@@ -117,7 +118,7 @@ export function Cart() {
             <span className="eyebrow">THE GOOD PART</span>
             <h2>Order summary</h2>
             <div className="summary-line">
-              <span>Subtotal ({count} items)</span>
+              <span>Subtotal ({count} {count === 1 ? "item" : "items"})</span>
               <span>{money(basket.data.total)}</span>
             </div>
             <div className="summary-line">

@@ -1,5 +1,17 @@
 # Validation
 
+## Real Stripe test-mode payments — 2026-10-08
+
+- Configured the supplied test key in ignored `.env`; the CLI signing secret is captured locally without printing credentials. The official Stripe CLI 1.53.1 Windows binary was verified against its release SHA-256 before use. The background listener forwards supported Checkout events to Gateway on port 8180.
+- `stripe-checkout-test.mjs start` passed against real Stripe: concurrent Checkout requests reuse one Session; authoritative amount/currency and order metadata match; return URLs are correct; Demo simulation is disabled; anonymous and other-customer access is rejected; invalid signatures return 400.
+- Explicitly expired a real Stripe Session through Stripe's API. The CLI-delivered signed expiry event cancelled the order, returned reserved stock and retained the basket.
+- Browser verified storefront sign-in, the order page's Stripe resume button, hosted sandbox Checkout and the return page showing **Confirmed**, payment received and an empty bag. Stripe's API independently reported `livemode=false`, `payment_status=paid` and USD 1.23. Adaptive Pricing recorded a separate VND 33,223 presentment amount; the USD webhook matching succeeded.
+- `stripe-checkout-test.mjs verify` passed: the actual signed completion webhook confirmed the order, committed reserved inventory, removed the purchased quantity and exposed the confirmed admin order. Replaying the actual completion event twice with a fresh local signature left payment and inventory unchanged. This verifies our durable receipt handling, not Stripe Dashboard resend delivery.
+- The authenticated synthetic fixture harness also passed invalid signatures, wrong amounts, success/expiry duplicate receipts and compensation. Its temporary Payment container was removed. It consumed one seeded MX Master 3S; other tests used isolated products. Isolated test products were hidden and their remaining available stock cleared, including the earlier interrupted check; customer/order and audit history remain.
+- Backend Release build: zero warnings/errors. xUnit: **33 passed**. Frontend ESLint and Docker production build including TypeScript: passed. Payment/frontend images were rebuilt and deployed; Compose configuration passed and all services with health checks are healthy. Seq is running without a configured health check.
+- Screenshot: ignored `artifacts/stripe-order-confirmed.jpg`. Runbook: [Stripe setup and verification](stripe.md).
+- Broker-outage/restart recovery, a new-machine/full clean-stack rehearsal and GitHub Actions for these uncommitted changes were not tested. Live payments, refunds, shipment and actual email delivery remain outside this change.
+
 ## Shared device icons / photo revert — 2026-10-07
 
 - Reverted the vendor-photo experiment and removed its runtime assets, mapping and download script. Restored the six device SVGs, with neutral SSD labeling for reuse across brands.
@@ -66,6 +78,6 @@ Tests persisted demo orders and consumed one SSD, one mouse and two keyboards. T
 
 Checks are reproducible with dotnet test, frontend lint/typecheck/build, docker compose config, scripts/smoke-test.mjs and scripts/stripe-webhook-test.mjs as documented in the README.
 
-External Stripe API creation and a real Stripe test payment require user-supplied test credentials and an active webhook listener. Signed fixtures exercise our handler and persistence, not Stripe's external infrastructure.
+At the baseline verification above, external Stripe API creation and a real Stripe test payment were unverified. They were subsequently verified with test credentials and an active listener on 2026-10-08, as recorded at the top of this document. Signed fixtures alone exercise our handler and persistence, not Stripe's external infrastructure.
 
 Dependency note: npm audit --omit=dev reported no production vulnerabilities. The development-only Next.js ESLint chain includes braces <=3.0.3, GHSA-vfj7-8cjw-p6xm. The registry currently has no patched braces release; do not force npm's suggested downgrade to an incompatible Next.js lint configuration. Recheck on future dependency upgrades.

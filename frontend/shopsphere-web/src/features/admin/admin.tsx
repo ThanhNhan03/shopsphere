@@ -66,7 +66,64 @@ function AdminWorkspace({ section, email }: { section: string; email: string }) 
       {(section === "products" || section === "inventory") && <>
         <p className="admin-intro">{section === "products" ? "Edit your collection, upload photos, and control product visibility." : "Adjust available stock while keeping reserved units protected."}</p>
         <div className="admin-toolbar"><label className="admin-search"><Icon name="search" size={18} /><input aria-label="Search products" placeholder="Search name, brand, or category" value={query} onChange={e => setQuery(e.target.value)} /></label><select aria-label="Product visibility" value={active} onChange={e => setActive(e.target.value)}><option value="all">All products</option><option value="active">Active products</option><option value="inactive">Hidden products</option></select>{section === "products" && <button className="button" onClick={() => setEditProduct("new")}><Icon name="plus" size={17} />Add product</button>}</div>
-        {products.isPending || (section === "inventory" && stocks.isPending) ? <Loading /> : <div className="admin-panel admin-table-wrap"><table><thead><tr><th>Product</th><th>{section === "products" ? "Price" : "Available"}</th><th>{section === "products" ? "Visibility" : "Reserved"}</th><th>{section === "products" ? "Category" : "Stock level"}</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{list.map(p => { const stock = stockFor(p.id); return <tr key={p.id}><td><div className="admin-product-cell"><ProductImage src={p.imageUrl} name={p.name} category={p.category} /><div><strong>{p.name}</strong><small>{p.brand}</small></div></div></td><td>{section === "products" ? money(p.price) : stock.availableQuantity}</td><td>{section === "products" ? <Badge value={p.isActive ? "Active" : "Hidden"} /> : stock.reservedQuantity}</td><td>{section === "products" ? p.category : <Badge value={stock.availableQuantity === 0 ? "Empty" : stock.availableQuantity <= 5 ? "Low" : "Healthy"} />}</td><td><button className="admin-secondary" onClick={() => section === "products" ? setEditProduct(p) : setEditStock(p)}>{section === "products" ? "Edit" : "Adjust stock"}</button></td></tr>; })}</tbody></table>{!list.length && <p className="admin-empty">No products match this view.</p>}<div className="admin-table-footer">{list.length} products</div></div>}
+        {products.isPending || (section === "inventory" && stocks.isPending) ? (
+          <Loading />
+        ) : (
+          <div className={`admin-panel admin-table-wrap ${section === "inventory" ? "inventory-table" : "product-table"}`}>
+            <table aria-label={section === "products" ? "Product catalog" : "Product inventory"}>
+              <thead>
+                <tr>
+                  <th scope="col">Product</th>
+                  <th scope="col">{section === "products" ? "Price" : "Available"}</th>
+                  <th scope="col">{section === "products" ? "Visibility" : "Reserved"}</th>
+                  <th scope="col">{section === "products" ? "Category" : "Stock level"}</th>
+                  <th scope="col"><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((p) => {
+                  const stock = stockFor(p.id);
+                  const inventory = section === "inventory";
+                  return (
+                    <tr key={p.id}>
+                      <td>
+                        <span className="admin-mobile-label" aria-hidden="true">Product</span>
+                        <div className="admin-product-cell">
+                          <ProductImage src={p.imageUrl} name={p.name} category={p.category} />
+                          <div><strong>{p.name}</strong><small>{p.brand}</small></div>
+                        </div>
+                      </td>
+                      <td className="admin-number-cell">
+                        <span className="admin-mobile-label" aria-hidden="true">{inventory ? "Available" : "Price"}</span>
+                        {inventory ? stock.availableQuantity : money(p.price)}
+                      </td>
+                      <td className={inventory ? "admin-number-cell" : undefined}>
+                        <span className="admin-mobile-label" aria-hidden="true">{inventory ? "Reserved" : "Visibility"}</span>
+                        {inventory ? stock.reservedQuantity : <Badge value={p.isActive ? "Active" : "Hidden"} />}
+                      </td>
+                      <td>
+                        <span className="admin-mobile-label" aria-hidden="true">{inventory ? "Stock level" : "Category"}</span>
+                        {inventory
+                          ? <Badge value={stock.availableQuantity === 0 ? "Empty" : stock.availableQuantity <= 5 ? "Low" : "Healthy"} />
+                          : p.category}
+                      </td>
+                      <td>
+                        <span className="admin-mobile-label" aria-hidden="true">Actions</span>
+                        <button className="admin-secondary" onClick={() => inventory ? setEditStock(p) : setEditProduct(p)}>
+                          {inventory ? "Adjust stock" : "Edit"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {!list.length && <p className="admin-empty">No products match this view.</p>}
+            <div className="admin-table-footer">
+              {list.length} {section === "inventory" ? "products stocked" : "products"}
+            </div>
+          </div>
+        )}
       </>}
       {section === "orders" && <Orders />}
     </div>

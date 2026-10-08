@@ -6,6 +6,7 @@ using Xunit;
 using PaymentEntity = ShopSphere.Payment.Domain.Payment;
 
 namespace ShopSphere.Tests;
+[Trait("Category", "Unit")]
 public sealed class CheckoutRulesTests
 {
     [Fact] public void OrderUsesServerPricedItems()

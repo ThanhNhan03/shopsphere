@@ -8,6 +8,7 @@ using ShopSphere.SharedKernel;
 using Xunit;
 
 namespace ShopSphere.Tests;
+[Trait("Category", "Unit")]
 public sealed class AdministrationRulesTests
 {
     [Theory]

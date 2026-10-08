@@ -7,9 +7,12 @@
     <ProjectReference Include="../../src/Gateway/ShopSphere.Gateway/ShopSphere.Gateway.csproj" />
     <ProjectReference Include="../../src/Services/Catalog/ShopSphere.Catalog.Infrastructure/ShopSphere.Catalog.Infrastructure.csproj" />
     <ProjectReference Include="../../src/Services/Basket/ShopSphere.Basket.Application/ShopSphere.Basket.Application.csproj" />
+    <ProjectReference Include="../../src/Services/Basket/ShopSphere.Basket.Infrastructure/ShopSphere.Basket.Infrastructure.csproj" />
     <ProjectReference Include="../../src/Services/Inventory/ShopSphere.Inventory.Infrastructure/ShopSphere.Inventory.Infrastructure.csproj" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Moq" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

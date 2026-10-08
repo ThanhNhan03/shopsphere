@@ -8,6 +8,7 @@ using BasketView = ShopSphere.Basket.Application.Basket;
 
 namespace ShopSphere.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class MergeCompatibilityTests
 {
     [Theory]

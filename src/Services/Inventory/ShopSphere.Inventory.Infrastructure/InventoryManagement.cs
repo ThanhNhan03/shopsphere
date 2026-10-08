@@ -7,7 +7,17 @@ namespace ShopSphere.Inventory.Infrastructure;
 public record AdjustmentWrite(int Delta, int ExpectedAvailable, string Reason);
 public sealed class InventoryManagement(InventoryDb db, HttpClient catalog, IPublishEndpoint publish)
 {
-    public Task<List<Stock>> List(CancellationToken ct) => db.Stocks.AsNoTracking().ToListAsync(ct);
+    public static Guid[] ParseProductIds(string ids)
+    {
+        var parts = ids.Split(',', StringSplitOptions.RemoveEmptyEntries);
+        Guard.Require(parts.Length is >= 1 and <= 100 && parts.All(p => Guid.TryParse(p, out _)), "Provide 1–100 valid product IDs.");
+        return parts.Select(Guid.Parse).Distinct().ToArray();
+    }
+    public Task<List<Stock>> List(string ids, CancellationToken ct)
+    {
+        var products = ParseProductIds(ids);
+        return db.Stocks.AsNoTracking().Where(s => products.Contains(s.ProductId)).ToListAsync(ct);
+    }
     public Task<List<StockAdjustment>> History(Guid id, CancellationToken ct) => db.Adjustments.AsNoTracking().Where(a => a.ProductId == id).OrderByDescending(a => a.CreatedAt).Take(30).ToListAsync(ct);
     public async Task<Stock> Adjust(Guid id, AdjustmentWrite input, string actor, CancellationToken ct)
     {

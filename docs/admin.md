@@ -4,6 +4,8 @@
 
 Preserve your existing root `.env`. Run `./scripts/setup-local-admin.ps1`, then `docker compose up -d --build`. For an already running PostgreSQL instance, `docker compose run --rm postgres-init` can create the additional `identity_db` without removing existing databases or volumes.
 
+After switching or merging branches, rebuild the affected images with `docker compose up -d --build`. Restarting an existing container keeps its old image and environment; editing `.env` alone does not update a running container. Use `docker compose up -d` to apply environment changes to existing images.
+
 The setup script sets `ADMIN_BOOTSTRAP_EMAIL=admin@shopsphere.local` and generates a random password when those settings are missing. Account details are saved in `.local/admin-account.txt`; both that directory and `.env` are ignored by Git and the Docker build context. Gateway seeds the account once after migrations. It stores an ASP.NET Core PasswordHasher hash, never plaintext. Restarting containers or changing the bootstrap password does not reset an existing account. An existing customer with the bootstrap email causes a clear startup failure rather than silently granting permissions.
 
 Sign in at `/login` and open `/admin`. Customers can register at `/register` with a name, email, and password of 10–128 characters. Registration also starts a session. Emails are trimmed and normalized with a database unique constraint. Unknown accounts and incorrect passwords return the same login error. Registration cannot grant administrator permissions. Google and local identities remain separate; matching email addresses do not merge accounts or baskets.
@@ -17,7 +19,7 @@ Optional `ADMIN_EMAILS` accepts comma-separated verified Google email addresses.
 - **Inventory:** add/remove available units with a reason and a recorded administrator identity. Reserved units are protected. Row locking and expected availability prevent concurrent changes from silently losing updates. Recent history shows the latest 30 adjustments.
 - **Orders:** search ID/customer/email, filter status, page through orders, and inspect line items, totals, dates, and cancellation reasons. Status changes continue to follow inventory/payment events.
 
-This demo loads the full product catalog and stock list for management. Large catalogs need server-side pagination before scaling.
+Product and inventory screens use server-side search, visibility filters, and pagination (50 products per page, at most 100). Stock reads are limited to the products on the current page. Overview counts cover the complete catalog, with a preview of at most ten low-stock products from the Inventory availability projection.
 
 ## MinIO storage
 

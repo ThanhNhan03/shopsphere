@@ -29,7 +29,10 @@ app.MapGet("/api/products/{id:guid}", async (Guid id, ICatalog catalog, Cancella
 app.MapGet("/api/categories", (ICatalog catalog, CancellationToken ct) => catalog.Categories(ct));
 // Internal service endpoints are only reachable on the private Compose network.
 app.MapGet("/internal/products/{id:guid}", async (Guid id, CatalogManagement catalog, CancellationToken ct) => Results.Ok(await catalog.Find(id, ct)));
-app.MapGet("/api/admin/products", (CatalogManagement catalog, CancellationToken ct) => catalog.List(ct));
+app.MapGet("/api/admin/products", (string? q, string? visibility, int? page, int? pageSize, CatalogManagement catalog, CancellationToken ct) =>
+    catalog.List(q, visibility ?? "all", page ?? 1, pageSize ?? 50, ct));
+app.MapGet("/api/admin/products/summary", async (CatalogManagement catalog, AvailabilityReadiness readiness, CancellationToken ct) =>
+    readiness.Ready ? Results.Ok(await catalog.Summary(ct)) : Results.Problem("Product availability is updating. Please try again shortly.", statusCode: 503));
 app.MapGet("/api/admin/products/{id:guid}", async (Guid id, CatalogManagement catalog, CancellationToken ct) => Results.Ok(await catalog.Find(id, ct)));
 app.MapPost("/api/admin/products", async (ProductWrite input, CatalogManagement catalog, CancellationToken ct) =>
     Results.Ok(await catalog.Save(null, input, ct)));

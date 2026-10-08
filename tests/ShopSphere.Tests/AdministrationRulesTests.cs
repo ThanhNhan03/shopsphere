@@ -4,6 +4,7 @@ using ShopSphere.Catalog.Domain;
 using ShopSphere.Catalog.Infrastructure;
 using ShopSphere.Gateway;
 using ShopSphere.Inventory.Domain;
+using ShopSphere.Inventory.Infrastructure;
 using ShopSphere.SharedKernel;
 using Xunit;
 
@@ -33,6 +34,26 @@ public sealed class AdministrationRulesTests
     [Theory] [InlineData(0)] [InlineData(-1)] [InlineData(1.001)]
     public void InvalidProductPriceRejected(double price) => Assert.Throws<ApiException>(() => CatalogManagement.Validate(new("Product", "Description", (decimal)price, "Brand", "Audio", true)));
     [Fact] public void StaleProductVersionRejected() => Assert.Equal(409, Assert.Throws<ApiException>(() => CatalogManagement.CheckVersion(new Product { Version = 2 }, 1)).StatusCode);
+    [Theory]
+    [InlineData(0, 50, "all")]
+    [InlineData(1, 101, "all")]
+    [InlineData(1, 0, "all")]
+    [InlineData(1000001, 50, "all")]
+    [InlineData(1, 50, "unknown")]
+    public void AdminProductReadsRejectUnboundedOrInvalidQueries(int page, int pageSize, string visibility)
+        => Assert.Throws<ApiException>(() => CatalogManagement.ValidateList(null, visibility, page, pageSize));
+    [Fact]
+    public void AdminSearchLengthIsBounded()
+        => Assert.Throws<ApiException>(() => CatalogManagement.ValidateList(new string('a', 101), "all", 1, 50));
+    [Fact]
+    public void AdminStockReadsRequireABoundedBatchOfValidProductIds()
+    {
+        var id = Guid.NewGuid();
+        Assert.Equal(new[] { id }, InventoryManagement.ParseProductIds($"{id},{id}"));
+        Assert.Throws<ApiException>(() => InventoryManagement.ParseProductIds(""));
+        Assert.Throws<ApiException>(() => InventoryManagement.ParseProductIds("invalid"));
+        Assert.Throws<ApiException>(() => InventoryManagement.ParseProductIds(string.Join(',', Enumerable.Repeat(id.ToString(), 101))));
+    }
     [Fact] public void ImageTypeMustMatchBytes()
     {
         byte[] png = [137, 80, 78, 71, 13, 10, 26, 10];

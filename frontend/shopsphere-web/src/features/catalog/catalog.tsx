@@ -2,10 +2,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useIsMutating, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, money } from "@/lib/api";
-import type { Product } from "@/types";
-import { useBasketChange } from "@/components/store-provider";
+import type { CatalogProduct, Product, ProductPage, Stock, StockAvailability } from "@/types";
+import { useBasket, useBasketChange, useCustomer } from "@/components/store-provider";
 import { ProductImage } from "@/components/product-image";
 import { ErrorMessage, Loading } from "@/components/feedback";
 import { Icon } from "@/components/icon";
@@ -20,33 +20,44 @@ export function Catalog({
 }) {
   const router = useRouter();
   const [category, setCategory] = useState(initialCategory);
-  const [sort, setSort] = useState("featured");
+  const [sort, setSort] = useState("name");
   const [search, setSearch] = useState(initialQuery.trim());
+  const [page, setPage] = useState(1);
+  const [includeOutOfStock, setIncludeOutOfStock] = useState(false);
+  const pageSize = 24;
   const products = useQuery({
-    queryKey: ["products"],
-    queryFn: () => api<Product[]>("/api/products"),
+    queryKey: ["products", category, search, sort, page, includeOutOfStock],
+    queryFn: ({ signal }) => {
+      const query = new URLSearchParams({ sort, page: String(page), pageSize: String(pageSize) });
+      if (category !== "All") query.set("category", category);
+      if (search) query.set("q", search);
+      query.set("includeOutOfStock", String(includeOutOfStock));
+      return api<ProductPage>(`/api/products?${query}`, { signal });
+    },
+    refetchInterval: 30000,
+  });
+  const categoryList = useQuery({
+    queryKey: ["categories"],
+    queryFn: () => api<string[]>("/api/categories"),
+  });
+  const spotlight = useQuery({
+    queryKey: ["product", "00000000-0000-0000-0000-000000000001"],
+    queryFn: () => api<Product>("/api/products/00000000-0000-0000-0000-000000000001"),
   });
   const categories = [
     "All",
-    ...new Set(products.data?.map((p) => p.category) || []),
+    ...(categoryList.data || ["Accessories", "Audio", "Laptops", "Monitors", "Storage"]),
   ];
-  const featured = products.data?.find((p) => p.category === "Laptops");
-  const visible =
-    products.data
-      ?.filter(
-        (p) =>
-          (category === "All" || p.category === category) &&
-          `${p.name} ${p.brand} ${p.category}`
-            .toLowerCase()
-            .includes(search.toLowerCase()),
-      )
-      .sort((a, b) =>
-        sort === "price-low"
-          ? a.price - b.price
-          : sort === "price-high"
-            ? b.price - a.price
-            : a.name.localeCompare(b.name),
-      ) || [];
+  const featured = spotlight.data;
+  const visible = products.data?.items || [];
+  const ids = visible.map(p => p.id);
+  const availability = useQuery({
+    queryKey: ["stock-page", ids],
+    queryFn: ({ signal }) => api<StockAvailability[]>(`/api/inventory/availability?ids=${ids.join(",")}`, { signal }),
+    enabled: ids.length > 0,
+    refetchInterval: 10000,
+  });
+  const stockById = new Map(availability.data?.map(s => [s.productId, s.availableQuantity]));
   return (
     <>
       <section className="hero">
@@ -73,7 +84,7 @@ export function Catalog({
               <Icon name="box" size={16} />
               <Icon name="spark" size={16} />
             </span>
-            <span>Small collection. Big possibilities.</span>
+            <span>Everyday essentials. More possibilities.</span>
           </div>
         </div>
         <div className="hero-showcase">
@@ -122,17 +133,7 @@ export function Catalog({
           <br />
           <strong>THE TECH YOU LOVE.</strong>
         </span>
-        {[
-          ...new Set(
-            products.data?.map((p) => p.brand) || [
-              "Apple",
-              "Sony",
-              "Logitech",
-              "Samsung",
-              "Keychron",
-            ],
-          ),
-        ].map((brand) => (
+        {["Apple", "Sony", "Logitech", "Samsung", "Keychron"].map((brand) => (
           <span className="brand-word" key={brand}>
             {brand}
           </span>
@@ -154,26 +155,28 @@ export function Catalog({
               <button
                 key={c}
                 className={c === category ? "selected" : ""}
-                onClick={() => setCategory(c)}
+                onClick={() => { setCategory(c); setPage(1); }}
                 aria-pressed={c === category}
               >
                 {c === "All" ? "All essentials" : c}
-                <span>
-                  {c === "All"
-                    ? products.data?.length || 0
-                    : products.data?.filter((p) => p.category === c).length}
-                </span>
               </button>
             ))}
           </div>
+          <div className="catalog-options">
+          <label className="availability-filter">
+            <input type="checkbox" checked={includeOutOfStock}
+              onChange={e => { setIncludeOutOfStock(e.target.checked); setPage(1); }} />
+            Include out of stock
+          </label>
           <label className="sort-control">
             <span className="sr-only">Sort products</span>
-            <select value={sort} onChange={(e) => setSort(e.target.value)}>
-              <option value="featured">Name: A–Z</option>
+            <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }}>
+              <option value="name">Name: A–Z</option>
               <option value="price-low">Price: low to high</option>
               <option value="price-high">Price: high to low</option>
             </select>
           </label>
+          </div>
         </div>
         {search && (
           <div className="search-result">
@@ -182,6 +185,7 @@ export function Catalog({
               className="text-button"
               onClick={() => {
                 setSearch("");
+                setPage(1);
                 router.replace(
                   category === "All"
                     ? "/#collection"
@@ -207,6 +211,8 @@ export function Catalog({
               onClick={() => {
                 setSearch("");
                 setCategory("All");
+                setIncludeOutOfStock(false);
+                setPage(1);
                 router.replace("/#collection", { scroll: false });
               }}
             >
@@ -216,14 +222,27 @@ export function Catalog({
         ) : (
           <div className="product-grid">
             {visible.map((p) => (
-              <ProductCard key={p.id} product={p} />
+              <ProductCard key={p.id} product={p}
+                available={availability.error ? undefined : stockById.get(p.id)}
+                stockError={!!availability.error} />
             ))}
           </div>
+        )}
+        {!!products.data?.totalPages && products.data.totalPages > 1 && (
+          <nav className="catalog-pagination" aria-label="Product pages">
+            <button className="button" disabled={page === 1 || products.isFetching}
+              onClick={() => setPage((current) => current - 1)}>Previous</button>
+            <span role="status" aria-live="polite">
+              Page {page.toLocaleString()} of {products.data.totalPages.toLocaleString()}
+            </span>
+            <button className="button" disabled={page >= products.data.totalPages || products.isFetching}
+              onClick={() => setPage((current) => current + 1)}>Next</button>
+          </nav>
         )}
         <div className="collection-end">
           <span>Thoughtfully chosen. Ready for your everyday.</span>
           <span role="status" aria-live="polite">
-            {visible.length} essentials <Icon name="spark" size={16} />
+            {products.data?.totalCount.toLocaleString() || 0} {includeOutOfStock ? "essentials" : "available essentials"} <Icon name="spark" size={16} />
           </span>
         </div>
       </section>
@@ -276,8 +295,17 @@ export function Catalog({
     </>
   );
 }
-function ProductCard({ product: p }: { product: Product }) {
+function ProductCard({ product: p, available, stockError }: { product: CatalogProduct; available?: number; stockError: boolean }) {
   const change = useBasketChange();
+  const basket = useBasket();
+  const customer = useCustomer();
+  const writes = useIsMutating({ mutationKey: ["basket-change", customer] });
+  const client = useQueryClient();
+  const inBag = basket.data?.items.find(i => i.productId === p.id)?.quantity ?? 0;
+  const limitReached = available !== undefined && available > 0 && inBag >= Math.min(99, available);
+  const unavailable = available === 0;
+  const checking = available === undefined;
+  const basketUnknown = !!customer && (!basket.data || !!basket.error);
   return (
     <article className={`product-card product-${p.category.toLowerCase()}`}>
       <Link href={`/products/${p.id}`} className="product-visual">
@@ -296,16 +324,27 @@ function ProductCard({ product: p }: { product: Product }) {
           <strong>{money(p.price)}</strong>
           <button
             className="add-button"
-            aria-label={`Add ${p.name} to bag`}
-            disabled={change.isPending}
+            aria-label={unavailable ? `${p.name} is out of stock` : `Add ${p.name} to bag`}
+            disabled={writes > 0 || unavailable || checking || limitReached || basketUnknown}
             onClick={() =>
-              change.mutate({ productId: p.id, quantity: 1, method: "POST" })
+              change.mutate({ productId: p.id, quantity: 1, method: "POST" }, {
+                onError: () => {
+                  client.invalidateQueries({ queryKey: ["stock-page"] });
+                  client.invalidateQueries({ queryKey: ["products"] });
+                },
+              })
             }
           >
             <Icon name={change.isSuccess ? "check" : "plus"} size={18} />
-            <span>{change.isPending ? "Adding…" : "Add to bag"}</span>
+            <span>{unavailable ? "Out of stock" : checking ? stockError ? "Unavailable" : "Checking…"
+              : limitReached ? "Limit in bag" : change.isPending ? "Adding…" : "Add to bag"}</span>
           </button>
         </div>
+        <p className={`product-availability${unavailable || stockError ? " unavailable" : ""}`}>
+          {checking ? stockError ? "Availability cannot be checked right now." : "Checking availability…"
+            : unavailable ? "Currently out of stock." : available <= 5 ? `Only ${available} left in stock.` : "In stock."}
+          {limitReached && <> <Link href="/cart">Review your bag</Link></>}
+        </p>
         <ErrorMessage error={change.error} />
         {change.isSuccess && (
           <span role="status" className="success">
@@ -322,6 +361,19 @@ export function ProductDetail({ id }: { id: string }) {
     queryFn: () => api<Product>(`/api/products/${id}`),
   });
   const [quantity, setQuantity] = useState(1);
+  const basket = useBasket();
+  const customer = useCustomer();
+  const writes = useIsMutating({ mutationKey: ["basket-change", customer] });
+  const stock = useQuery({
+    queryKey: ["stock", id],
+    queryFn: ({ signal }) => api<Stock>(`/api/inventory/${id}`, { signal }),
+    refetchInterval: 5000,
+  });
+  const available = stock.data?.availableQuantity ?? 0;
+  const inBag = basket.data?.items.find(i => i.productId === id)?.quantity ?? 0;
+  const remaining = Math.max(0, Math.min(99, available) - inBag);
+  const limit = Math.max(1, remaining);
+  const selectedQuantity = Math.min(quantity, limit);
   const change = useBasketChange();
   if (product.isPending) return <Loading />;
   if (!product.data) return <ErrorMessage error={product.error} />;
@@ -353,14 +405,18 @@ export function ProductDetail({ id }: { id: string }) {
             {money(p.price)} <span>USD</span>
           </p>
           <p className="description">{p.description}</p>
+          <p className="input-hint" role="status">
+            {stock.isPending ? "Checking availability…" : stock.error ? "Availability is temporarily unavailable."
+              : available === 0 ? "Out of stock." : available <= 5 ? `Only ${available} left in stock.` : "In stock."}
+          </p>
           <div className="detail-actions">
             <div>
               <span className="input-caption">Quantity</span>
               <div className="quantity-control">
                 <button
                   aria-label="Decrease quantity"
-                  disabled={quantity <= 1}
-                  onClick={() => setQuantity((q) => q - 1)}
+                  disabled={selectedQuantity <= 1 || remaining === 0 || !!stock.error}
+                  onClick={() => setQuantity(Math.max(1, selectedQuantity - 1))}
                 >
                   <Icon name="minus" size={16} />
                 </button>
@@ -371,18 +427,19 @@ export function ProductDetail({ id }: { id: string }) {
                   id="product-quantity"
                   type="number"
                   min={1}
-                  max={99}
-                  value={quantity}
+                  max={limit}
+                  value={selectedQuantity}
+                  disabled={remaining === 0 || !!stock.error}
                   onChange={(e) =>
                     setQuantity(
-                      Math.max(1, Math.min(99, Number(e.target.value) || 1)),
+                      Math.max(1, Math.min(limit, Number(e.target.value) || 1)),
                     )
                   }
                 />
                 <button
                   aria-label="Increase quantity"
-                  disabled={quantity >= 99}
-                  onClick={() => setQuantity((q) => q + 1)}
+                  disabled={selectedQuantity >= limit || remaining === 0 || !!stock.error}
+                  onClick={() => setQuantity(selectedQuantity + 1)}
                 >
                   <Icon name="plus" size={16} />
                 </button>
@@ -390,16 +447,20 @@ export function ProductDetail({ id }: { id: string }) {
             </div>
             <button
               className="button"
-              disabled={change.isPending}
+              disabled={writes > 0 || !stock.data || remaining === 0 || !!stock.error || (!!customer && (!basket.data || !!basket.error))}
               onClick={() =>
-                change.mutate({ productId: p.id, quantity, method: "POST" })
+                change.mutate({ productId: p.id, quantity: selectedQuantity, method: "POST" }, { onError: () => stock.refetch() })
               }
             >
               <Icon name="bag" />
-              {change.isPending ? "Adding to your bag…" : "Add to shopping bag"}
+              {available === 0 && !stock.isPending ? "Out of stock" : remaining === 0 && available > 0 ? "Limit in bag"
+                : change.isPending ? "Adding to your bag…" : "Add to shopping bag"}
               <Icon name="arrow" size={18} />
             </button>
           </div>
+          {available > 0 && remaining === 0 && (
+            <p className="input-hint">You already have the maximum quantity in your bag. <Link href="/cart">Review your bag</Link>.</p>
+          )}
           <ErrorMessage error={change.error} />
           {change.isSuccess && (
             <p role="status" className="success">
@@ -418,7 +479,7 @@ export function ProductDetail({ id }: { id: string }) {
           <details className="product-notes">
             <summary>Before you checkout</summary>
             <p>
-              Availability is checked when you create an order. Items are
+              Availability is checked when you update your bag and again before creating an order. Items are
               reserved while payment is pending and released if the order is
               cancelled.
             </p>

@@ -233,6 +233,11 @@ namespace ShopSphere.Inventory.Infrastructure.Persistence.Migrations
                     b.Property<int>("ReservedQuantity")
                         .HasColumnType("integer");
 
+                    b.Property<long>("Version")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L);
+
                     b.HasKey("ProductId");
 
                     b.ToTable("Stocks", t =>
@@ -245,37 +250,43 @@ namespace ShopSphere.Inventory.Infrastructure.Persistence.Migrations
                         {
                             ProductId = new Guid("00000000-0000-0000-0000-000000000001"),
                             AvailableQuantity = 20,
-                            ReservedQuantity = 0
+                            ReservedQuantity = 0,
+                            Version = 0L
                         },
                         new
                         {
                             ProductId = new Guid("00000000-0000-0000-0000-000000000002"),
                             AvailableQuantity = 20,
-                            ReservedQuantity = 0
+                            ReservedQuantity = 0,
+                            Version = 0L
                         },
                         new
                         {
                             ProductId = new Guid("00000000-0000-0000-0000-000000000003"),
                             AvailableQuantity = 20,
-                            ReservedQuantity = 0
+                            ReservedQuantity = 0,
+                            Version = 0L
                         },
                         new
                         {
                             ProductId = new Guid("00000000-0000-0000-0000-000000000004"),
                             AvailableQuantity = 20,
-                            ReservedQuantity = 0
+                            ReservedQuantity = 0,
+                            Version = 0L
                         },
                         new
                         {
                             ProductId = new Guid("00000000-0000-0000-0000-000000000005"),
                             AvailableQuantity = 20,
-                            ReservedQuantity = 0
+                            ReservedQuantity = 0,
+                            Version = 0L
                         },
                         new
                         {
                             ProductId = new Guid("00000000-0000-0000-0000-000000000006"),
                             AvailableQuantity = 20,
-                            ReservedQuantity = 0
+                            ReservedQuantity = 0,
+                            Version = 0L
                         });
                 });
 

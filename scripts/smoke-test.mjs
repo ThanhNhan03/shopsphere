@@ -16,9 +16,7 @@ async function until(read, predicate, label) {
   }
   throw new Error(`Timed out: ${label}`);
 }
-const products = await request("/api/products");
-assert.equal(products.length, 6);
-const product = products.find(p => p.name === "Portable SSD T7");
+const product = await request("/api/products/00000000-0000-0000-0000-000000000006");
 const initial = await request(`/api/inventory/${product.id}`);
 async function checkout(quantity) {
   const customerId = randomUUID();

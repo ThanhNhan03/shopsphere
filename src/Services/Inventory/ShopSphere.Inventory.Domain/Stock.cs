@@ -9,13 +9,16 @@ public sealed class Stock
     {
         Guard.Require(delta != 0 && (long)AvailableQuantity + delta is >= 0 and <= 1_000_000, "The adjustment must leave available stock between 0 and 1,000,000.");
         AvailableQuantity += delta;
+        Version++;
     }
+    public long Version { get; set; }
     public bool Reserve(int quantity)
     {
         Guard.Require(quantity > 0, "Reservation quantity must be positive.");
         if (AvailableQuantity < quantity) return false;
         AvailableQuantity -= quantity;
         ReservedQuantity += quantity;
+        Version++;
         return true;
     }
     public void Release(int quantity)
@@ -23,11 +26,13 @@ public sealed class Stock
         Guard.Require(quantity > 0 && quantity <= ReservedQuantity, "Invalid inventory release.");
         ReservedQuantity -= quantity;
         AvailableQuantity += quantity;
+        Version++;
     }
     public void Commit(int quantity)
     {
         Guard.Require(quantity > 0 && quantity <= ReservedQuantity, "Invalid inventory commitment.");
         ReservedQuantity -= quantity;
+        Version++;
     }
 }
 public sealed class StockAdjustment

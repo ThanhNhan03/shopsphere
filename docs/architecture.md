@@ -4,6 +4,10 @@ Next.js uses a server-side same-origin API proxy to YARP. Gateway routes product
 
 Catalog, Ordering, Inventory and Payment own separate PostgreSQL databases on one instance. Redis holds baskets. Service databases are never queried by another service.
 
+Catalog maintains a versioned availability query projection using Inventory events delivered through its transactional outbox and a Catalog inbox/outbox consumer. Initial/periodic reconciliation uses bounded private Inventory HTTP snapshots. The default product query filters positive projected stock before count/pagination; the storefront additionally reads current stock in one batch per page. See [catalog availability](catalog-availability.md) for API, initialization and eventual-consistency limits.
+
+Basket reads product/pricing data over Catalog HTTP and available sellable stock over Inventory HTTP. Its responses include per-line availability and a checkout eligibility flag. Redis Lua caps cumulative additions at the fetched stock snapshot while allowing an oversized saved quantity to be reduced. Ordering fetches this enriched basket and rejects a known shortage with HTTP 409 before persisting an order; an unverifiable stock lookup returns HTTP 503. These advisory checks do not hold stock. The final Inventory reservation transaction below remains authoritative when buyers compete for the last units.
+
 Each major service has Domain, Application, Infrastructure and Api projects. Basket needs no domain project for its quantity hash. Two building blocks contain boundary errors/validation and shared hosting, logging and MassTransit configuration; contracts carry integration events.
 
 MassTransit **8.5.11** is pinned intentionally. Version 9 introduces commercial licensing; the project uses the open-source v8 line. See the [official repository](https://github.com/MassTransit/MassTransit) and [outbox documentation](https://masstransit.io/documentation/configuration/middleware/outbox).

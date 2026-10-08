@@ -59,8 +59,8 @@ Closing/cancelling Stripe Checkout does not immediately cancel the order: paymen
 ## Checkout behavior
 
 1. Catalog serves products and prices from `catalog_db`.
-2. Basket stores product quantities in Redis and reads current product information over Catalog HTTP.
-3. Ordering reads the basket over HTTP, validates details and calculates the amount on the server.
+2. Basket stores product quantities in Redis and reads current product information over Catalog HTTP and available stock over Inventory HTTP. Adding/increasing a line checks its cumulative quantity against current stock.
+3. Ordering reads the refreshed basket over HTTP, rejects known stock shortages before creating an order, validates details and calculates the amount on the server.
 4. Ordering atomically stores the order and `OrderCreatedIntegrationEvent` through the EF transactional bus outbox.
 5. Inventory locks stock rows in product-ID order, reserves all items atomically and emits a reservation result.
 6. Payment creates a pending payment from the reservation event; the checkout endpoint creates an idempotent Stripe Session on demand.
@@ -68,6 +68,10 @@ Closing/cancelling Stripe Checkout does not immediately cancel the order: paymen
 8. Payment failure cancels the order and emits a release request; Inventory returns reserved stock and Basket remains available for retry.
 
 `CheckoutId` is the order ID and retry key. Repeating the same checkout concurrently returns the original order; reusing that ID with different customer details returns an error. Prices supplied by the browser are ignored.
+
+Basket lines expose `availableQuantity`, and the basket exposes `canCheckout`. Known shortages return HTTP 409; unavailable Inventory checks return HTTP 503. Bag checks do not reserve stock: another buyer can acquire the last units before the final locked Inventory reservation, which may still reject the order.
+
+The catalog lists available products by default; **Include out of stock** explicitly shows sold-out items with purchasing disabled. Availability is projected from Inventory events before pagination and checked live in one batch per visible page. Existing bag quantities count toward the add limit. See [catalog availability](docs/catalog-availability.md) for synchronization, contracts and checks.
 
 MassTransit provides persistent bus/consumer outboxes, transactional inbox processing, a seven-day duplicate detection window, retries, and error queues. Domain transitions and reservation records also protect against repeated business operations. Stripe event IDs are retained durably. See [architecture](docs/architecture.md), [order flow](docs/order-flow.md), and [event contracts](docs/events.md).
 
@@ -136,6 +140,22 @@ node --env-file=.env scripts/admin-smoke-test.mjs
 ```
 
 The authenticated smoke check exercises registration/login/logout, administrator authorization, MinIO image replacement, visibility, concurrent edit protection, stock adjustment history, concurrent checkout retries and order confirmation. It uses an isolated customer/product/order, then hides the test product and clears its available stock. The test account and order remain in history. The original anonymous `smoke-test.mjs` still needs authentication updates; do not disable Gateway authorization to run it. The webhook harness now registers its own customers. For real Stripe Sessions and CLI-delivered events, use `scripts/stripe-checkout-test.mjs` as described in the [Stripe runbook](docs/stripe.md).
+
+To verify that Catalog ignores delayed or duplicate stock events, run this check against a local Compose stack with RabbitMQ management and Catalog available:
+
+```powershell
+node scripts/verify-availability-projection.mjs
+```
+
+The check publishes isolated stock events through RabbitMQ and removes its temporary catalog projection row. It does not create products, orders, payments, or alter a customer's basket.
+
+The older baseline smoke harness is also available:
+
+```powershell
+node scripts/smoke-test.mjs
+```
+
+The baseline smoke check exercises real HTTP, PostgreSQL, Redis and RabbitMQ, including concurrent checkout retries, duplicate settlement, insufficient inventory and compensation. It consumes one SSD per successful run and uses isolated customer IDs. Its anonymous Gateway calls predate mandatory sign-in and require an authenticated harness before use with the current configuration.
 
 Signed webhook fixtures can be checked without a Stripe account:
 

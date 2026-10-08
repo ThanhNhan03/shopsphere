@@ -3,7 +3,7 @@ import Link from "next/link";
 import { SignInPrompt } from "@/components/sign-in-prompt";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useIsMutating } from "@tanstack/react-query";
 import { z } from "zod";
 import {
   useBasket,
@@ -30,6 +30,7 @@ export function Checkout() {
   const customer = useCustomer();
   const router = useRouter();
   const session = useSession();
+  const basketChanges = useIsMutating({ mutationKey: ["basket-change", customer] });
   const [errors, setErrors] = useState<Partial<Record<keyof Fields, string>>>(
     {},
   );
@@ -50,11 +51,11 @@ export function Checkout() {
       sessionStorage.removeItem(`shopsphere-checkout-${customer}`);
       router.push(`/orders/${result.id}`);
     },
+    onError: () => basket.refetch(),
   });
   if (!customer) return <SignInPrompt returnUrl="/checkout" />;
   if (basket.isPending) return <Loading />;
-  if (basket.error) return <ErrorMessage error={basket.error} />;
-  if (basket.data?.items.some(i => !i.isAvailable)) return <div className="empty"><h1>Some products are unavailable.</h1><p>Remove them from your bag before checking out.</p><Link href="/cart" className="button">Review your bag</Link></div>;
+  if (basket.error && !basket.data) return <ErrorMessage error={basket.error} />;
   if (!basket.data?.items.length)
     return (
       <div className="empty">
@@ -96,6 +97,7 @@ export function Checkout() {
           noValidate
           onSubmit={(event) => {
             event.preventDefault();
+            if (!basket.data?.canCheckout || basketChanges || basket.error || order.isPending) return;
             const form = event.currentTarget;
             const result = schema.safeParse(
               Object.fromEntries(new FormData(form)),
@@ -181,7 +183,13 @@ export function Checkout() {
             </div>
           </div>
           <ErrorMessage error={order.error} />
-          <button className="button full" disabled={order.isPending}>
+          <ErrorMessage error={basket.error} />
+          {!basket.data.canCheckout && (
+            <p className="field-error" role="status">
+              Some items are no longer available in the requested quantity. <Link href="/cart">Update your bag</Link> to continue.
+            </p>
+          )}
+          <button className="button full" disabled={order.isPending || basketChanges > 0 || !basket.data.canCheckout || !!basket.error}>
             {order.isPending
               ? "Creating your order…"
               : "Create order & continue"}

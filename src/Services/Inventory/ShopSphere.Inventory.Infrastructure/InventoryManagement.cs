@@ -1,9 +1,11 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using ShopSphere.Contracts;
 using ShopSphere.Inventory.Domain;
 using ShopSphere.SharedKernel;
 namespace ShopSphere.Inventory.Infrastructure;
 public record AdjustmentWrite(int Delta, int ExpectedAvailable, string Reason);
-public sealed class InventoryManagement(InventoryDb db, HttpClient catalog)
+public sealed class InventoryManagement(InventoryDb db, HttpClient catalog, IPublishEndpoint publish)
 {
     public Task<List<Stock>> List(CancellationToken ct) => db.Stocks.AsNoTracking().ToListAsync(ct);
     public Task<List<StockAdjustment>> History(Guid id, CancellationToken ct) => db.Adjustments.AsNoTracking().Where(a => a.ProductId == id).OrderByDescending(a => a.CreatedAt).Take(30).ToListAsync(ct);
@@ -20,6 +22,8 @@ public sealed class InventoryManagement(InventoryDb db, HttpClient catalog)
         if (stock.AvailableQuantity != input.ExpectedAvailable) throw new ApiException(409, "Stock changed while you were editing. Refresh and try again.");
         stock.Adjust(input.Delta);
         db.Adjustments.Add(new StockAdjustment { ProductId = id, Delta = input.Delta, AvailableAfter = stock.AvailableQuantity, Reason = input.Reason.Trim(), PerformedBy = actor });
+        await publish.Publish(new StockAvailabilityChangedIntegrationEvent(Guid.NewGuid(), id,
+            DateTimeOffset.UtcNow, stock.ProductId, stock.AvailableQuantity, stock.Version), ct);
         await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
         return stock;
     }

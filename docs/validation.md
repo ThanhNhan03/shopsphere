@@ -1,5 +1,12 @@
 # Validation
 
+## Stock-aware catalog and checkout — 2026-10-08
+
+- Catalog now lists available products by default, supports category/search/sort/pagination, and exposes an explicit out-of-stock filter. Live stock batches drive storefront availability and quantity limits.
+- Inventory stock changes publish versioned events; Catalog applies newer versions and reconciles bounded snapshots. Basket add/update and Ordering checkout reject known shortages; the final locked Inventory reservation remains authoritative for competing purchases.
+- `dotnet test ShopSphere.sln -c Release`: **40 passed**. Frontend ESLint, `next typegen` plus TypeScript, and the Next.js production build passed. `docker compose config --quiet` passed.
+- The real RabbitMQ projection verification script is available at `scripts/verify-availability-projection.mjs`; it was not run in this validation. Docker images for Catalog, Basket, Ordering, Inventory and the frontend built successfully; Compose services were not restarted and no data volume was changed.
+
 ## Real Stripe test-mode payments — 2026-10-08
 
 - Configured the supplied test key in ignored `.env`; the CLI signing secret is captured locally without printing credentials. The official Stripe CLI 1.53.1 Windows binary was verified against its release SHA-256 before use. The background listener forwards supported Checkout events to Gateway on port 8180.
